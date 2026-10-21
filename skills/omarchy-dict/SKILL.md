@@ -20,8 +20,12 @@ define --es "casa de campo"  # multi-word headwords work
 
 Answer from the output rather than from memory, and say which dictionary each
 sense came from. For long entries, pipe through `head` or `grep` instead of
-reading everything. To query a single database directly, use
-`dict -d <db> <word>`, listing local databases with `dict -h localhost -D`.
+reading everything. To query a single database directly, name its server:
+`dict -h localhost -d <db> <word>` for the local ones (`gcide`, `eng-spa`,
+`spa-eng`, `es-es`; list them with `dict -h localhost -D`), and
+`dict -h dict.org -d <db> <word>` for the rest (`wn`, `moby-thesaurus`, and
+the `fd-*` translation dictionaries). A plain `dict` only asks dict.org when
+the local server is down.
 
 If nothing is found, `define` prints "No definitions found" with spelling
 suggestions. Try the suggestion or the base form of the word (infinitive or
