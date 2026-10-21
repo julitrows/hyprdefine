@@ -34,7 +34,7 @@ class Renderer(HTMLParser):
         super().__init__(convert_charrefs=True)
         self.lines = []
         self.text = ""
-        self.lists = []  # one [style, counter] per open <ol>
+        self.lists = []  # one [style, counter, numbered] per open <ol>
         self.skip = 0  # depth inside <svg>, whose contents are drawings
 
     def flush(self):
@@ -44,14 +44,17 @@ class Renderer(HTMLParser):
             return
 
         depth = max(len(self.lists) - 1, 0)
-        prefix = ""
+        label = ""
+        numbered = True
         if self.lists and self.lists[-1][1] > 0:
-            style, counter = self.lists[-1]
-            prefix = f"{chr(96 + counter)})" if style == "alpha" else f"{counter}."
-            prefix += " "
+            style, counter, numbered = self.lists[-1]
+            label = (f"{chr(96 + counter)})" if style == "alpha" else f"{counter}.") + " "
+            self.lists[-1][2] = True
 
-        first = INDENT + "  " * depth + prefix
-        rest = INDENT + "  " * depth + " " * len(prefix)
+        # Only an item's first chunk of text carries its number; later chunks,
+        # such as text after a line break or a nested list, line up under it.
+        rest = INDENT + "  " * depth + " " * len(label)
+        first = rest if numbered else INDENT + "  " * depth + label
         self.lines += textwrap.wrap(text, WIDTH, initial_indent=first, subsequent_indent=rest)
 
     def handle_starttag(self, tag, attrs):
@@ -60,11 +63,12 @@ class Renderer(HTMLParser):
         elif tag == "ol":
             self.flush()
             style = dict(attrs).get("style") or ""
-            self.lists.append(["alpha" if "alpha" in style else "number", 0])
+            self.lists.append(["alpha" if "alpha" in style else "number", 0, True])
         elif tag == "li":
             self.flush()
             if self.lists:
                 self.lists[-1][1] += 1
+                self.lists[-1][2] = False
         elif tag == "p":
             self.flush()
 
