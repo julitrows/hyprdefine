@@ -11,6 +11,7 @@ import os
 import pty
 import re
 import select
+import signal
 import struct
 import sys
 import termios
@@ -59,9 +60,18 @@ def main():
 
     os.write(fd, b"\r")
     read(1)
-    _, status = os.waitpid(pid, 0)
-    if status != 0:
-        print(f"FAIL  define exited with status {status}")
+
+    # An empty word should end the loop; kill define rather than hang if not.
+    deadline = time.time() + 5
+    while (status := os.waitpid(pid, os.WNOHANG)) == (0, 0) and time.time() < deadline:
+        read(0.1)
+    if status == (0, 0):
+        os.kill(pid, signal.SIGKILL)
+        os.waitpid(pid, 0)
+        print("FAIL  define didn't exit on an empty word")
+        failures += 1
+    elif status[1] != 0:
+        print(f"FAIL  define exited with status {status[1]}")
         failures += 1
 
     sys.exit(1 if failures else 0)
