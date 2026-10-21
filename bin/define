@@ -1,0 +1,27 @@
+#!/bin/bash
+
+# Look up words with dict(1). Pass a word to look it up once, or run with no
+# arguments to keep prompting until an empty word is entered.
+
+lookup() {
+  dict -- "$1" 2>&1 | less --quit-if-one-screen --prompt="$1 (q to go back)"
+}
+
+ask() {
+  if command -v gum >/dev/null; then
+    gum input --placeholder "Word to define (Enter on empty to quit)" --prompt "Define: "
+  else
+    read -rp "Define: " word && echo "$word"
+  fi
+}
+
+if (( $# > 0 )); then
+  lookup "$*"
+  exit
+fi
+
+while word=$(ask) && [[ -n $word ]]; do
+  clear
+  lookup "$word"
+  clear
+done
