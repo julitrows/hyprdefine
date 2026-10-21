@@ -10,6 +10,9 @@ DICTD_CONF=/etc/dict/dictd.conf
 SPANISH_DIR=/usr/local/share/dictd
 
 rm -f "$HOME/.local/bin/define"
+if [[ -L $HOME/.claude/skills/omarchy-dict ]]; then
+  rm "$HOME/.claude/skills/omarchy-dict"
+fi
 sed -i '/-- omarchy-dict$/d' "$HYPRLAND_LUA"
 hyprctl reload >/dev/null
 

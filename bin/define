@@ -72,7 +72,9 @@ lookup() {
     fi
   fi
 
-  less "${pager[@]}" --prompt="$1 (q to go back)" <<<"$found"
+  # The leading "s" picks less's short prompt, and the escapes keep prompt
+  # syntax such as "?" and "." in the word literal.
+  less "${pager[@]}" --prompt="s$(sed 's/[?%\\:.]/\\&/g' <<<"$1") (q to go back)" <<<"$found"
 }
 
 ask() {

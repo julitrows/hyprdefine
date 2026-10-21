@@ -52,6 +52,12 @@ echo "Linking define into ~/.local/bin..."
 mkdir -p "$HOME/.local/bin"
 ln -sfn "$REPO/bin/define" "$HOME/.local/bin/define"
 
+if [[ -d $HOME/.claude ]]; then
+  echo "Linking the omarchy-dict skill into ~/.claude/skills..."
+  mkdir -p "$HOME/.claude/skills"
+  ln -sfn "$REPO/skills/omarchy-dict" "$HOME/.claude/skills/omarchy-dict"
+fi
+
 if ! grep -qF -e "$MARKER" "$HYPRLAND_LUA"; then
   echo "Loading the keybindings from $HYPRLAND_LUA..."
   printf '\ndofile("%s/hypr/dictionary.lua") %s\n' "$REPO" "$MARKER" >>"$HYPRLAND_LUA"

@@ -30,6 +30,7 @@ The installer:
   and installs it to `/usr/local/share/dictd`, registered as `es-es` in
   `/etc/dict/dictd.conf`
 - links `bin/define` to `~/.local/bin/define`
+- links the Claude Code skill into `~/.claude/skills`, if you use Claude Code
 - appends a `dofile(...)` line to `~/.config/hypr/hyprland.lua` that loads
   `hypr/dictionary.lua`
 
@@ -46,6 +47,16 @@ reader.dict publishes a new Spanish build twice a month. To pick one up, run
   the Spanish one. Type a word and press Enter, then `q` to get back to the
   prompt. Press Enter on an empty prompt to close it.
 - From any terminal: `define serendipity` or `define --es ñandú`.
+
+## Claude Code
+
+- **For users:** `skills/omarchy-dict` is a skill that lets Claude look words
+  up with `define`, and fix or rebind the popup. `install.sh` links it into
+  `~/.claude/skills` when `~/.claude` exists.
+- **For contributors:** `CLAUDE.md` explains how the project works and the
+  pitfalls it has already hit. Under `.claude/`, the `test-define` skill runs
+  the end-to-end checks, `add-language` walks through adding a language, and
+  the `reviewer` agent reviews changes before a commit.
 
 ## Changing the keys
 
