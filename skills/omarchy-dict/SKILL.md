@@ -15,7 +15,7 @@ Run it with a word to print the result and exit:
 ```bash
 define serendipity           # Webster's 1913, WordNet, Moby thesaurus, English → Spanish
 define --es ñandú            # Spanish Wiktionary, Spanish → English
-define "casa de campo"       # multi-word headwords work
+define --es "casa de campo"  # multi-word headwords work
 ```
 
 Answer from the output rather than from memory, and say which dictionary each
