@@ -60,7 +60,10 @@ fi
 
 if ! grep -qF -e "$MARKER" "$HYPRLAND_LUA"; then
   echo "Loading the keybindings from $HYPRLAND_LUA..."
-  printf '\ndofile("%s/hypr/dictionary.lua") %s\n' "$REPO" "$MARKER" >>"$HYPRLAND_LUA"
+  # No blank line before it, so uninstall.sh's one-line delete leaves the file
+  # as it was. Only add a newline if the file doesn't end with one.
+  [[ -z $(tail -c1 "$HYPRLAND_LUA") ]] || echo >>"$HYPRLAND_LUA"
+  printf 'dofile("%s/hypr/dictionary.lua") %s\n' "$REPO" "$MARKER" >>"$HYPRLAND_LUA"
 fi
 
 # hyprctl fails outside a Hyprland session, such as over SSH; the bindings load
