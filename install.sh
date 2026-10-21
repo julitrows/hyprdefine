@@ -29,7 +29,11 @@ install_spanish() {
       "$build/es-es"
   dictzip "$build/es-es.dict"
   sudo install -Dm644 -t "$SPANISH_DIR" "$build/es-es.dict.dz" "$build/es-es.index"
+}
 
+# Runs on every install, so a block lost from dictd.conf comes back even when
+# the dictionary files are already in place.
+register_spanish() {
   if ! grep -q "^database es-es" "$DICTD_CONF"; then
     printf '# omarchy-dict begin\ndatabase es-es {\n\tdata %s/es-es.dict.dz\n\tindex %s/es-es.index\n}\n# omarchy-dict end\n' \
       "$SPANISH_DIR" "$SPANISH_DIR" | sudo tee -a "$DICTD_CONF" >/dev/null
@@ -44,6 +48,7 @@ omarchy pkg aur add dict-gcide dict-freedict-eng-spa-bin dict-freedict-spa-eng-b
 if [[ ${1:-} == --update || ! -f $SPANISH_DIR/es-es.index ]]; then
   install_spanish
 fi
+register_spanish
 
 sudo systemctl enable dictd
 sudo systemctl restart dictd
