@@ -9,10 +9,17 @@ HYPRLAND_LUA="$HOME/.config/hypr/hyprland.lua"
 DICTD_CONF=/etc/dict/dictd.conf
 SPANISH_DIR=/usr/local/share/dictd
 
-rm -f "$HOME/.local/bin/define"
-if [[ -L $HOME/.claude/skills/omarchy-dict ]]; then
-  rm "$HOME/.claude/skills/omarchy-dict"
-fi
+REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Only remove links that point into this repo, never someone else's files.
+remove_link() {
+  if [[ -L $1 && $(readlink "$1") == "$2" ]]; then
+    rm "$1"
+  fi
+}
+
+remove_link "$HOME/.local/bin/define" "$REPO/bin/define"
+remove_link "$HOME/.claude/skills/omarchy-dict" "$REPO/skills/omarchy-dict"
 sed -i '/-- omarchy-dict$/d' "$HYPRLAND_LUA"
 
 sudo sed -i '/^# omarchy-dict begin$/,/^# omarchy-dict end$/d' "$DICTD_CONF"
