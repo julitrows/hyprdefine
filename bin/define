@@ -2,24 +2,95 @@
 
 # Look up words with dict(1). Pass a word to look it up once, or run with no
 # arguments to keep prompting until an empty word is entered.
+#
+# Usage: define [--es] [word...]
+#   --es  Spanish definitions and Spanish to English translations
+
+# Databases to search, as "local remote" pairs: the local dictd server is used
+# when it has the database, and dict.org when it doesn't. A "-" means there is
+# no such database on that side.
+ENGLISH=("gcide gcide" "- wn" "- moby-thesaurus" "eng-spa fd-eng-spa")
+SPANISH=("es-es -" "spa-eng fd-spa-eng")
+
+databases=("${ENGLISH[@]}")
+prompt="Define: "
+placeholder="Word to define (Enter on empty to quit)"
+
+if [[ ${1:-} == --es ]]; then
+  shift
+  databases=("${SPANISH[@]}")
+  prompt="Definir: "
+  placeholder="Palabra (Enter vacío para salir)"
+fi
+
+# Print a database's definitions without dict's "N definitions found" banner.
+query() {
+  dict -h "$1" -d "$2" -- "$3" 2>/dev/null | sed '1{/definitions\? found$/{N;d}}'
+  return "${PIPESTATUS[0]}"
+}
+
+search() {
+  local local_db remote_db status=39
+  read -r local_db remote_db <<<"$1"
+
+  if [[ $local_db != - ]]; then
+    query localhost "$local_db" "$2"
+    status=$?
+  fi
+
+  # 0 is a match and 20/21 a miss; anything else means the local server or
+  # database isn't there.
+  if (( status != 0 && status != 20 && status != 21 )) && [[ $remote_db != - ]]; then
+    query dict.org "$remote_db" "$2"
+  fi
+}
+
+# Search every database at once, then print the results in order.
+definitions() {
+  local results i
+  results=$(mktemp -d)
+
+  for i in "${!databases[@]}"; do
+    search "${databases[$i]}" "$1" >"$results/$i" &
+  done
+  wait
+
+  for i in "${!databases[@]}"; do
+    [[ -s $results/$i ]] && cat "$results/$i" && echo
+  done
+  rm -r "$results"
+}
 
 lookup() {
-  dict -- "$1" 2>&1 | less --quit-if-one-screen --prompt="$1 (q to go back)"
+  local found suggestions
+
+  found=$(definitions "$1")
+  if [[ -z $found ]]; then
+    found="No definitions found for \"$1\""
+    if suggestions=$(dict -h localhost -m -s lev -- "$1" 2>/dev/null); then
+      found+=$'\n\nPerhaps you mean:\n'"$suggestions"
+    fi
+  fi
+
+  less "${pager[@]}" --prompt="$1 (q to go back)" <<<"$found"
 }
 
 ask() {
   if command -v gum >/dev/null; then
-    gum input --placeholder "Word to define (Enter on empty to quit)" --prompt "Define: "
+    gum input --placeholder "$placeholder" --prompt "$prompt"
   else
-    read -rp "Define: " word && echo "$word"
+    read -rp "$prompt" word && echo "$word"
   fi
 }
 
 if (( $# > 0 )); then
+  pager=(--quit-if-one-screen)
   lookup "$*"
   exit
 fi
 
+# Keep the pager open even for short entries, or the prompt's clear wipes them.
+pager=()
 while word=$(ask) && [[ -n $word ]]; do
   clear
   lookup "$word"
