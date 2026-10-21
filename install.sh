@@ -63,7 +63,11 @@ if ! grep -qF -e "$MARKER" "$HYPRLAND_LUA"; then
   printf '\ndofile("%s/hypr/dictionary.lua") %s\n' "$REPO" "$MARKER" >>"$HYPRLAND_LUA"
 fi
 
-hyprctl reload >/dev/null
-hyprctl configerrors
+# hyprctl fails outside a Hyprland session, such as over SSH; the bindings load
+# on the next login instead.
+if [[ -n ${HYPRLAND_INSTANCE_SIGNATURE:-} ]]; then
+  hyprctl reload >/dev/null
+  hyprctl configerrors
+fi
 
 echo "Done. Press SUPER + ALT + D for English or SUPER + SHIFT + ALT + D for Spanish."

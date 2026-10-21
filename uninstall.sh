@@ -14,12 +14,16 @@ if [[ -L $HOME/.claude/skills/omarchy-dict ]]; then
   rm "$HOME/.claude/skills/omarchy-dict"
 fi
 sed -i '/-- omarchy-dict$/d' "$HYPRLAND_LUA"
-hyprctl reload >/dev/null
 
 sudo sed -i '/^# omarchy-dict begin$/,/^# omarchy-dict end$/d' "$DICTD_CONF"
 sudo rm -f "$SPANISH_DIR/es-es.dict.dz" "$SPANISH_DIR/es-es.index"
 if systemctl -q is-active dictd; then
   sudo systemctl restart dictd
+fi
+
+# hyprctl fails outside a Hyprland session, such as over SSH.
+if [[ -n ${HYPRLAND_INSTANCE_SIGNATURE:-} ]]; then
+  hyprctl reload >/dev/null
 fi
 
 echo "Removed. Uninstall the packages with:"
