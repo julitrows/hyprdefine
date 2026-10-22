@@ -39,7 +39,7 @@ English comes from dict.org.
 
    ```bash
    cd packaging
-   updpkgsums                         # from pacman-contrib; replaces 'SKIP'
+   updpkgsums                         # from pacman-contrib; fills in sha256sums
    makepkg --printsrcinfo > .SRCINFO
    ```
 

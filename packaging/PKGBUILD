@@ -12,7 +12,7 @@ optdepends=('dict-gcide: offline English definitions (AUR)')
 checkdepends=(lua)
 install=hyprdefine.install
 source=("$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/v$pkgver.tar.gz")
-sha256sums=('SKIP')
+sha256sums=('1557145302c69126a2b6e65c9b50dff91e5669c0b84ffec2e380cad6c1ebf6e6')
 
 check() {
   cd "$pkgname-$pkgver"

@@ -18,6 +18,6 @@ pkgbase = hyprdefine
 	depends = xdg-terminal-exec
 	optdepends = dict-gcide: offline English definitions (AUR)
 	source = hyprdefine-0.1.0.tar.gz::https://github.com/julitrows/hyprdefine/archive/refs/tags/v0.1.0.tar.gz
-	sha256sums = SKIP
+	sha256sums = 1557145302c69126a2b6e65c9b50dff91e5669c0b84ffec2e380cad6c1ebf6e6
 
 pkgname = hyprdefine
