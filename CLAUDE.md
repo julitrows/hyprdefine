@@ -32,12 +32,17 @@ on dict.org.
 
 ## Gotchas
 
-- **Omarchy's Hyprland config is Lua**, not `hyprland.conf`. Use the `o.bind`
-  and `o.window` helpers from `$OMARCHY_PATH/default/hypr/helpers.lua`, and
-  read `/usr/share/omarchy/` freely but never edit it.
-- Launch through `omarchy-launch-tui --app-id=TUI.dictionary`, which works
-  with every terminal Omarchy supports. `TUI.*` app-ids get Omarchy's terminal
-  styling.
+- **Omarchy and plain Hyprland on Arch are both supported.** Only Hyprland's
+  Lua config is, not `hyprland.conf`. `hypr/dictionary.lua` has two branches,
+  picked by whether Omarchy's `o.bind` helper exists; keep their keys and
+  window rules in step. Read `/usr/share/omarchy/` freely but never edit it.
+- On Omarchy, launch through `omarchy-launch-tui --app-id=TUI.dictionary`,
+  whose `TUI.*` app-id gets Omarchy's terminal styling, and float with the
+  `floating-window` tag. On plain Hyprland, launch through
+  `xdg-terminal-exec --app-id=TUI.dictionary` and set `float`, `center` and
+  `size` directly, matching that tag.
+- **Packages**: `install.sh` uses `omarchy pkg` when `omarchy` exists, and
+  otherwise `pacman` with `yay` or `paru` for the AUR packages.
 - **less prompts**: `--prompt=` treats the first letter as a prompt-type
   selector (`h`, `s`, `m`, `M`, `=`, `w`), and `?`, `%`, `\`, `:` and `.` are
   prompt syntax. Keep the leading `s` and the escaping in `lookup`.

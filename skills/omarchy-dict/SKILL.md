@@ -1,6 +1,6 @@
 ---
 name: omarchy-dict
-description: Look up English or Spanish words (definitions, synonyms, translations) with the omarchy-dict define command, and troubleshoot or customise its Super+Alt+D dictionary popup on Omarchy. Use when asked what a word means, for a synonym or a translation between English and Spanish, or about the dictionary keybinding.
+description: Look up English or Spanish words (definitions, synonyms, translations) with the omarchy-dict define command, and troubleshoot or customise its Super+Alt+D dictionary popup on Omarchy or Hyprland. Use when asked what a word means, for a synonym or a translation between English and Spanish, or about the dictionary keybinding.
 ---
 
 # omarchy-dict
@@ -38,8 +38,9 @@ singular).
 
 They're defined in `hypr/dictionary.lua` in the omarchy-dict repo, which is
 loaded from `~/.config/hypr/hyprland.lua` by a line ending in
-`-- omarchy-dict`. To change a key, edit the `o.bind(...)` line there, check
-the new key is free with `omarchy menu keybindings --print`, then run
+`-- omarchy-dict`. To change a key, edit the binding there: `o.bind(...)` on
+Omarchy, `hl.bind(...)` on plain Hyprland. On Omarchy, check the new key is
+free with `omarchy menu keybindings --print`. Then run
 `hyprctl reload && hyprctl configerrors`.
 
 ## Troubleshooting

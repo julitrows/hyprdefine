@@ -1,7 +1,8 @@
 #!/bin/bash
 
 # Install omarchy-dict: dictionary packages, the Spanish dictionary, the define
-# command and the Hyprland keybindings. Safe to run more than once.
+# command and the Hyprland keybindings. Safe to run more than once. Works on
+# Omarchy and on any Arch install running Hyprland with a Lua config.
 #
 # Usage: ./install.sh [--update]
 #   --update  download and rebuild the Spanish dictionary even if it's installed
@@ -40,9 +41,30 @@ register_spanish() {
   fi
 }
 
+install_aur() {
+  if command -v omarchy >/dev/null; then
+    omarchy pkg aur add "$@"
+  elif command -v yay >/dev/null; then
+    yay -S --needed --noconfirm "$@"
+  elif command -v paru >/dev/null; then
+    paru -S --needed --noconfirm "$@"
+  else
+    return 1
+  fi
+}
+
+if [[ ! -f $HYPRLAND_LUA ]]; then
+  echo "omarchy-dict needs Hyprland's Lua config, and $HYPRLAND_LUA doesn't exist." >&2
+  exit 1
+fi
+
 echo "Installing dictionary packages..."
-omarchy pkg add dictd python
-omarchy pkg aur add dict-gcide dict-freedict-eng-spa-bin dict-freedict-spa-eng-bin ||
+if command -v omarchy >/dev/null; then
+  omarchy pkg add dictd python
+else
+  sudo pacman -S --needed --noconfirm dictd python xdg-terminal-exec
+fi
+install_aur dict-gcide dict-freedict-eng-spa-bin dict-freedict-spa-eng-bin ||
   echo "Could not install the offline dictionaries from the AUR; define will use dict.org."
 
 if [[ ${1:-} == --update || ! -f $SPANISH_DIR/es-es.index ]]; then

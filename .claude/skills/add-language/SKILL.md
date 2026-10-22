@@ -36,11 +36,12 @@ Tell the user what you found, including anything missing, before writing code.
   `/usr/local/share/dictd`, inside the same `# omarchy-dict begin/end` block,
   and add the AUR packages. `--update` should rebuild every language.
 - **`uninstall.sh`**: remove the new files, and list the new packages in the
-  `omarchy pkg drop` hint.
+  `omarchy pkg drop` and `pacman -Rns` hints.
 - **`bin/define`**: add a database array and a `--<lang>` flag with a prompt
   and placeholder in that language. Keep `"local remote"` pairs, with `-` for
   a side that doesn't exist.
-- **`hypr/dictionary.lua`**: add a binding. Check the key is free with
+- **`hypr/dictionary.lua`**: add a binding to both the Omarchy and the
+  plain-Hyprland branch. Check the key is free with
   `omarchy menu keybindings --print` and say which key you chose.
 - **README.md and `skills/omarchy-dict/SKILL.md`**: update the table, keys and
   credits.

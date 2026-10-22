@@ -1,8 +1,9 @@
 # omarchy-dict
 
-A dictionary on a keystroke for [Omarchy](https://omarchy.org/). Press
-**Super + Alt + D**, type a word and read its definition in a floating terminal
-that follows your theme. **Super + Shift + Alt + D** does the same in Spanish.
+A dictionary on a keystroke for [Omarchy](https://omarchy.org/), or any Arch
+install running Hyprland. Press **Super + Alt + D**, type a word and read its
+definition in a floating terminal. **Super + Shift + Alt + D** does the same in
+Spanish.
 
 ![Looking up "serendipity" in English and "ñandú" in Spanish](docs/demo.gif)
 
@@ -27,7 +28,9 @@ cd ~/code/omarchy-dict
 The installer:
 
 - installs `dictd`, `dict-gcide`, `dict-freedict-eng-spa-bin` and
-  `dict-freedict-spa-eng-bin` (AUR) and enables the local `dictd` server
+  `dict-freedict-spa-eng-bin` (AUR) and enables the local `dictd` server.
+  Outside Omarchy it uses `pacman`, plus `yay` or `paru` for the AUR, and
+  installs `xdg-terminal-exec` to open your default terminal
 - downloads the Spanish dictionary from reader.dict, converts it to plain text
   and installs it to `/usr/local/share/dictd`, registered as `es-es` in
   `/etc/dict/dictd.conf`
@@ -35,6 +38,10 @@ The installer:
 - links the Claude Code skill into `~/.claude/skills`, if you use Claude Code
 - appends a `dofile(...)` line to `~/.config/hypr/hyprland.lua` that loads
   `hypr/dictionary.lua`
+
+Hyprland must use the Lua config (`~/.config/hypr/hyprland.lua`), as Omarchy
+and current Hyprland do. On Omarchy the popup follows your theme; elsewhere it's
+your default terminal, floated and centred.
 
 The repo stays the source of truth, so edits here take effect after a
 `hyprctl reload`. Don't move the repo after installing; if you do, run
@@ -62,9 +69,10 @@ reader.dict publishes a new Spanish build twice a month. To pick one up, run
 
 ## Changing the keys
 
-Edit the `o.bind(...)` lines in `hypr/dictionary.lua`. Check that a key is free
-with `omarchy menu keybindings --print`, or call `hl.unbind("<keys>")` before
-the binding to replace an Omarchy default.
+Edit the bindings in `hypr/dictionary.lua`: the `o.bind(...)` lines on Omarchy,
+or the `hl.bind(...)` lines on plain Hyprland. On Omarchy, check that a key is
+free with `omarchy menu keybindings --print`, or call `hl.unbind("<keys>")`
+before the binding to replace an Omarchy default.
 
 ## Uninstall
 

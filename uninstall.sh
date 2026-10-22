@@ -20,7 +20,9 @@ remove_link() {
 
 remove_link "$HOME/.local/bin/define" "$REPO/bin/define"
 remove_link "$HOME/.claude/skills/omarchy-dict" "$REPO/skills/omarchy-dict"
-sed -i '/-- omarchy-dict$/d' "$HYPRLAND_LUA"
+if [[ -f $HYPRLAND_LUA ]]; then
+  sed -i '/-- omarchy-dict$/d' "$HYPRLAND_LUA"
+fi
 
 sudo sed -i '/^# omarchy-dict begin$/,/^# omarchy-dict end$/d' "$DICTD_CONF"
 sudo rm -f "$SPANISH_DIR/es-es.dict.dz" "$SPANISH_DIR/es-es.index"
@@ -34,4 +36,8 @@ if [[ -n ${HYPRLAND_INSTANCE_SIGNATURE:-} ]]; then
 fi
 
 echo "Removed. Uninstall the packages with:"
-echo "  omarchy pkg drop dict-freedict-spa-eng-bin dict-freedict-eng-spa-bin dict-gcide dictd"
+if command -v omarchy >/dev/null; then
+  echo "  omarchy pkg drop dict-freedict-spa-eng-bin dict-freedict-eng-spa-bin dict-gcide dictd"
+else
+  echo "  sudo pacman -Rns dict-freedict-spa-eng-bin dict-freedict-eng-spa-bin dict-gcide dictd"
+fi

@@ -23,8 +23,9 @@ Check:
 3. **Lookup fallback.** dict.org may only be queried for databases the local
    server doesn't have, so a local miss (20 or 21) mustn't trigger a remote
    query. Local and remote database names must be right.
-4. **Hyprland Lua.** Use Omarchy's `o.bind`/`o.window` helpers, no duplicate
-   keys, and nothing written to `/usr/share/omarchy`.
+4. **Hyprland Lua.** Omarchy's `o.bind`/`o.window` helpers in the Omarchy
+   branch and raw `hl.*` calls in the plain-Hyprland branch, with the same keys
+   in both, no duplicate keys, and nothing written to `/usr/share/omarchy`.
 5. **Quoting and failure handling** in Bash under `set -euo pipefail`, and
    standard-library-only Python.
 6. **Docs.** README.md, CLAUDE.md and `skills/omarchy-dict/SKILL.md` must
