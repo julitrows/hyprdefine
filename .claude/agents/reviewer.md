@@ -13,8 +13,11 @@ Check:
 
 1. **Installer idempotency and symmetry.** Running `install.sh` twice must
    change nothing the second time. Everything it adds must be removed by
-   `uninstall.sh`: symlinks, the `dofile` marker line, the `dictd.conf` block,
-   files in `/usr/local/share/dictd` and the skill link. Check every
+   `uninstall.sh`: symlinks (`define`, the skill, the systemd unit), the
+   `dofile` marker line, `~/.local/share/omarchy-dict` and
+   `~/.config/omarchy-dict`, and any legacy system-wide dictionaries.
+   `lib/dictionaries` must stay sudo-free, and installing then removing a
+   language must leave no files behind. Check every
    `grep`/`sed` pattern actually matches what was written, including patterns
    that start with `-`.
 2. **define's prompt loop.** Short entries must stay on screen, `less` prompts
@@ -27,9 +30,10 @@ Check:
    branch and raw `hl.*` calls in the plain-Hyprland branch, keys declared
    once through the shared `bind`, no duplicate keys, and nothing written to
    `/usr/share/omarchy`.
-5. **Languages.** `lib/languages` is the only list of languages: `install.sh`,
-   `uninstall.sh` and `define` must read it rather than naming languages
-   themselves, apart from English's own databases.
+5. **Languages.** `lib/languages` is the only list of languages: every script
+   must read it rather than naming languages itself, apart from English's own
+   databases. The install offer must never block the prompt loop, and Esc
+   must not decline.
 6. **Quoting and failure handling** in Bash under `set -euo pipefail`, and
    standard-library-only Python.
 7. **Docs.** README.md, CLAUDE.md and `skills/omarchy-dict/SKILL.md` must

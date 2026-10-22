@@ -1,6 +1,6 @@
 ---
 name: test-define
-description: Test omarchy-dict end to end after changing define, the Lua bindings, the reader.dict converter, the language list or the installer. Use before committing, or when a lookup misbehaves in the floating window.
+description: Test omarchy-dict end to end after changing define, the language management, the Wiktionary or FreeDict helpers, the Lua bindings, the reader.dict converter or the installer. Use before committing, or when a lookup misbehaves in the floating window.
 ---
 
 # Test define
@@ -11,15 +11,16 @@ result. Stop and fix the first failure before moving on.
 1. **Syntax**, always:
 
    ```bash
-   bash -n bin/define install.sh uninstall.sh
+   bash -n bin/define lib/dictionaries install.sh uninstall.sh
    luac -p hypr/dictionary.lua
-   python3 -I -m py_compile lib/reader-dict.py tests/interactive.py
+   python3 -I -m py_compile lib/reader-dict.py lib/wiktionary.py lib/freedict.py tests/interactive.py
+   rm -rf lib/__pycache__ tests/__pycache__
    ```
 
-2. **Local server**: `dict -h localhost -D` should list `gcide` and a
-   `<code>-<code>` database for each other language in
-   `~/.config/omarchy-dict/languages`. If any are missing, the user needs to
-   run `./install.sh` in their own terminal, because it uses `sudo`.
+2. **Local server**: `dict -h localhost -p 2629 -D` should list `gcide` (if
+   English is installed) and a `<code>-<code>` database for each other
+   language in `~/.config/omarchy-dict/languages`, plus translation pairs
+   between them. `systemctl --user status omarchy-dict` shows the server.
 
 3. **One-shot lookups** for both languages and a miss:
 
@@ -27,17 +28,25 @@ result. Stop and fix the first failure before moving on.
    define house | head
    define serendipity | grep '^From'     # WordNet and Moby come from dict.org
    define --es ñandú | head
-   define casa | grep -E '^(From|═)'     # a heading per language that matched
+   define casa | grep -E '^(From|═|Also)' # headings, and "Also in" once one is installed
+   define Haus | head -3                 # German, from Wiktionary unless installed
    define zzqxv                          # "No definitions found"
    ```
 
-   To try other language sets without touching the user's config, point
-   `define` at a scratch one:
+   To try languages without touching the user's, install them into a scratch
+   home with stand-ins for `systemctl` and `notify-send`, serve them yourself
+   on port 2629 (only while the user's `omarchy-dict.service` is stopped or
+   not installed), and point `define` at the scratch config:
 
    ```bash
-   dir="$(mktemp -d)"; mkdir "$dir/omarchy-dict"
-   echo "en es fr" >"$dir/omarchy-dict/languages"
-   XDG_CONFIG_HOME="$dir" define chat | grep -E '^(From|═)'
+   dir="$(mktemp -d)"; mkdir -p "$dir/bin" "$dir/home"
+   printf '#!/bin/sh\n' >"$dir/bin/systemctl"; cp "$dir/bin/systemctl" "$dir/bin/notify-send"
+   chmod +x "$dir/bin/"*
+   HOME="$dir/home" XDG_CONFIG_HOME="$dir/home/.config" PATH="$dir/bin:$PATH" lib/dictionaries install en la
+   data="$dir/home/.local/share/omarchy-dict"
+   dictd -c "$data/dictd.conf" -p 2629 --listen-to 127.0.0.1 --locale C.UTF-8 --pid-file "$dir/pid" -L "$dir/log"
+   XDG_CONFIG_HOME="$dir/home/.config" define rosa | grep -E '^(From|═|Also)'
+   kill "$(cat "$dir/pid")"
    ```
 
 4. **Prompt loop**, the way the keybinding runs it. Include a short entry, a

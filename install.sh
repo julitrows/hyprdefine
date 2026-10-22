@@ -1,100 +1,27 @@
 #!/bin/bash
 
-# Install omarchy-dict: dictionary packages, a dictionary for each chosen
-# language, the define command and the Hyprland keybindings. Safe to run more
-# than once. Works on Omarchy and on any Arch install running Hyprland with a
-# Lua config.
+# Install omarchy-dict: packages, the user-level dictionary server, the define
+# command and the Hyprland keybindings. Safe to run more than once. Works on
+# Omarchy and on any Arch install running Hyprland with a Lua config.
 #
-# Usage: ./install.sh [--update] [--languages=en,es,...]
-#   --update     download and rebuild the chosen dictionaries even if they're
-#                installed
-#   --languages  the languages to install, by code from lib/languages. Without
-#                it, asks, starting from the last choice (or from English and
-#                Spanish, the first time). Run again to change them.
+# Languages are offered as words are looked up in them, and managed with
+# `define --languages`; they don't need sudo.
+#
+# Usage: ./install.sh [--languages=en,es,...] [--update]
+#   --languages  install these languages now, by code from lib/languages
+#   --update     rebuild the installed languages from the latest downloads
 
 set -euo pipefail
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 HYPRLAND_LUA="$HOME/.config/hypr/hyprland.lua"
-DICTD_CONF=/etc/dict/dictd.conf
-DICT_DIR=/usr/local/share/dictd
-READER_URL=https://www.reader-dict.com/file
 MARKER="-- omarchy-dict"
-LANGUAGES_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/omarchy-dict/languages"
-
-# Supported languages, in the order they're offered and saved.
-LANGUAGES=()
-declare -A FREEDICT NAMES
-while read -r code freedict name; do
-  [[ -z $code || $code == \#* ]] && continue
-  LANGUAGES+=("$code")
-  FREEDICT[$code]=$freedict
-  NAMES[$code]=$name
-done <"$REPO/lib/languages"
-
-# Download reader.dict's dictionary for a language and install it as
-# <code>-<code>. English uses GCIDE from the AUR instead.
-install_language() {
-  local code=$1 dir="$build/$1"
-  mkdir -p "$dir"
-
-  echo "Downloading the ${NAMES[$code]} dictionary..."
-  curl -fL --progress-bar -o "$dir/download.zip" "$READER_URL/$code/dictorg-$code-$code-noetym.zip"
-
-  echo "Building the ${NAMES[$code]} dictionary (takes a minute or two)..."
-  python3 -I "$REPO/lib/reader-dict.py" "$dir/download.zip" |
-    dictfmt -f --utf8 --quiet --columns 0 \
-      -u https://www.reader-dict.com -s "${NAMES[$code]} (Wiktionary, reader.dict)" \
-      "$dir/$code-$code"
-  dictzip "$dir/$code-$code.dict"
-  sudo install -Dm644 -t "$DICT_DIR" "$dir/$code-$code.dict.dz" "$dir/$code-$code.index"
-}
-
-remove_language() {
-  if [[ -f $DICT_DIR/$1-$1.index ]]; then
-    echo "Removing the ${NAMES[$1]} dictionary..."
-    sudo rm -f "$DICT_DIR/$1-$1.dict.dz" "$DICT_DIR/$1-$1.index"
-  fi
-}
-
-# Rewrite the block in dictd.conf on every install, so it lists exactly the
-# chosen languages, and comes back if it was lost.
-register_languages() {
-  local code block=""
-
-  for code in $languages; do
-    [[ $code == en ]] && continue
-    block+=$(printf 'database %s {\n\tdata %s\n\tindex %s\n}' "$code-$code" \
-      "$DICT_DIR/$code-$code.dict.dz" "$DICT_DIR/$code-$code.index")$'\n'
-  done
-
-  sudo sed -i '/^# omarchy-dict begin$/,/^# omarchy-dict end$/d' "$DICTD_CONF"
-  if [[ -n $block ]]; then
-    printf '# omarchy-dict begin\n%s# omarchy-dict end\n' "$block" | sudo tee -a "$DICTD_CONF" >/dev/null
-  fi
-}
-
-# Ask which languages to install, with the given ones selected, and print
-# their codes.
-ask_languages() {
-  local code options=() selected=() answer
-
-  for code in "${LANGUAGES[@]}"; do options+=("${NAMES[$code]} ($code)"); done
-  if command -v gum >/dev/null; then
-    for code in $1; do selected+=("${NAMES[$code]} ($code)"); done
-    answer=$(IFS=,; gum choose --no-limit --height 20 --header "Languages to install" \
-      --selected="${selected[*]}" "${options[@]}")
-    sed -n 's/.*(\([a-z]*\))$/\1/p' <<<"$answer"
-  else
-    printf '%s\n' "${options[@]}" | column >&2
-    read -rp "Languages to install, by code [$1]: " answer
-    echo "${answer:-$1}"
-  fi
-}
-
-has() {
-  [[ " $languages " == *" $1 "* ]]
-}
+DATA="$HOME/.local/share/omarchy-dict"
+CONFIG="${XDG_CONFIG_HOME:-$HOME/.config}/omarchy-dict"
+UNIT="$HOME/.config/systemd/user/omarchy-dict.service"
+# Where versions before the user-level server kept their dictionaries.
+LEGACY_CONF=/etc/dict/dictd.conf
+LEGACY_DIR=/usr/local/share/dictd
 
 install_aur() {
   if command -v omarchy >/dev/null; then
@@ -108,21 +35,36 @@ install_aur() {
   fi
 }
 
-# Print which of the given packages exist in the AUR.
-aur_packages() {
-  local query
-  query=$(printf '&arg[]=%s' "$@")
-  curl -fsS "https://aur.archlinux.org/rpc/v5/info?${query#&}" |
-    python3 -I -c 'import json, sys; print(*(r["Name"] for r in json.load(sys.stdin)["results"]))'
+# Move dictionaries an earlier version installed system-wide into $DATA, and
+# print their codes. Copying them saves rebuilding.
+migrate() {
+  local code
+  grep -q '^# omarchy-dict begin$' "$LEGACY_CONF" 2>/dev/null || return 0
+
+  echo "Moving dictionaries from an earlier version into $DATA..." >&2
+  mkdir -p "$DATA/dictionaries"
+  while read -r code _; do
+    [[ -z $code || $code == \#* ]] && continue
+    if [[ -f $LEGACY_DIR/$code-$code.index ]]; then
+      # Runs inside $(...), where set -e doesn't apply, so only delete the
+      # originals once they're copied.
+      if cp -n "$LEGACY_DIR/$code-$code.dict.dz" "$LEGACY_DIR/$code-$code.index" "$DATA/dictionaries/"; then
+        sudo rm -f "$LEGACY_DIR/$code-$code.dict.dz" "$LEGACY_DIR/$code-$code.index"
+        echo "$code"
+      fi
+    fi
+  done <"$REPO/lib/languages"
+  sudo sed -i '/^# omarchy-dict begin$/,/^# omarchy-dict end$/d' "$LEGACY_CONF"
+  sudo systemctl try-restart dictd
 }
 
+languages=()
 update=false
-languages=""
 for arg in "$@"; do
   case $arg in
+    --languages=*) read -r -a languages <<<"$(tr ',' ' ' <<<"${arg#--languages=}")" ;;
     --update) update=true ;;
-    --languages=*) languages=${arg#--languages=} ;;
-    *) echo "Usage: ./install.sh [--update] [--languages=en,es,...]" >&2; exit 2 ;;
+    *) echo "Usage: ./install.sh [--languages=en,es,...] [--update]" >&2; exit 2 ;;
   esac
 done
 
@@ -131,73 +73,35 @@ if [[ ! -f $HYPRLAND_LUA ]]; then
   exit 1
 fi
 
-if [[ -z $languages ]]; then
-  saved=$(cat "$LANGUAGES_FILE" 2>/dev/null || echo "en es")
-  if [[ -t 0 ]]; then
-    languages=$(ask_languages "$saved")
-  else
-    languages=$saved
-  fi
-fi
-picked=" $(tr ',\n' '  ' <<<"$languages") "
-for code in $picked; do
-  if [[ -z ${NAMES[$code]:-} ]]; then
-    echo "Unknown language \"$code\". Choose from: ${LANGUAGES[*]}." >&2
-    exit 2
-  fi
-done
-# Always in LANGUAGES order, so results are listed in a stable order.
-languages=""
-for code in "${LANGUAGES[@]}"; do
-  [[ $picked != *" $code "* ]] || languages+="$code "
-done
-languages=${languages% }
-if [[ -z $languages ]]; then
-  echo "Choose at least one language." >&2
-  exit 2
-fi
-echo "Installing: $(for code in $languages; do printf '%s, ' "${NAMES[$code]}"; done | sed 's/, $//')"
-
-echo "Installing dictionary packages..."
+echo "Installing packages..."
 if command -v omarchy >/dev/null; then
-  omarchy pkg add dictd python wl-clipboard
+  omarchy pkg add dictd python wl-clipboard gum libnotify
 else
-  sudo pacman -S --needed --noconfirm dictd python wl-clipboard xdg-terminal-exec
+  sudo pacman -S --needed --noconfirm dictd python wl-clipboard gum libnotify xdg-terminal-exec
+fi
+# GCIDE is the one dictionary that isn't downloaded per user: English uses it
+# from the package when it's there, and from dict.org when it isn't.
+install_aur dict-gcide ||
+  echo "Could not install dict-gcide from the AUR; English definitions will come from dict.org."
+
+read -r -a migrated <<<"$(migrate | xargs)"
+# Earlier versions always had English, so keep it alongside what they built.
+if (( ${#migrated[@]} )) && [[ ! -s $CONFIG/languages ]]; then
+  languages+=(en "${migrated[@]}")
 fi
 
-# GCIDE for English, and any prebuilt FreeDict translations between the chosen
-# languages. define uses dict.org for the ones that aren't packaged.
-wanted=()
-has en && wanted+=(dict-gcide)
-for from in $languages; do
-  for to in $languages; do
-    [[ $from == "$to" ]] || wanted+=("dict-freedict-${FREEDICT[$from]}-${FREEDICT[$to]}-bin")
-  done
-done
-read -r -a aur <<<"$(aur_packages "${wanted[@]}" || true)"
-if (( ${#aur[@]} )); then
-  install_aur "${aur[@]}" ||
-    echo "Could not install the offline dictionaries from the AUR; define will use dict.org."
+echo "Setting up the dictionary server..."
+mkdir -p "$(dirname "$UNIT")"
+ln -sfn "$REPO/systemd/omarchy-dict.service" "$UNIT"
+systemctl --user daemon-reload
+systemctl --user enable omarchy-dict.service
+
+if (( ${#languages[@]} )); then
+  "$REPO/lib/dictionaries" install "${languages[@]}"
 fi
-
-build=$(mktemp -d)
-trap 'rm -rf "$build"' EXIT
-for code in "${LANGUAGES[@]}"; do
-  [[ $code == en ]] && continue
-  if ! has "$code"; then
-    remove_language "$code"
-  elif [[ $update == true || ! -f $DICT_DIR/$code-$code.index ]]; then
-    install_language "$code"
-  fi
-done
-register_languages
-
-# define reads this, so write it before the first lookup.
-mkdir -p "$(dirname "$LANGUAGES_FILE")"
-echo "$languages" >"$LANGUAGES_FILE"
-
-sudo systemctl enable dictd
-sudo systemctl restart dictd
+if [[ $update == true ]]; then
+  "$REPO/lib/dictionaries" update
+fi
 
 echo "Linking define into ~/.local/bin..."
 mkdir -p "$HOME/.local/bin"
@@ -225,3 +129,4 @@ if [[ -n ${HYPRLAND_INSTANCE_SIGNATURE:-} ]]; then
 fi
 
 echo "Done. Press SUPER + ALT + D to look a word up, or SUPER + ALT + W for the selected word."
+echo "Languages are offered as you use them; run 'define --languages' to manage them."

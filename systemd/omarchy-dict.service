@@ -1,0 +1,16 @@
+# omarchy-dict's dictionary server: a user-level dictd for the dictionaries in
+# ~/.local/share/omarchy-dict, listening on localhost only. Linked into
+# ~/.config/systemd/user by install.sh; lib/dictionaries writes its config and
+# restarts it.
+
+[Unit]
+Description=omarchy-dict dictionary server
+# dictd won't start without a database, so wait until one is installed.
+ConditionFileNotEmpty=%h/.local/share/omarchy-dict/dictd.conf
+
+[Service]
+ExecStart=/usr/bin/dictd -c %h/.local/share/omarchy-dict/dictd.conf -p 2629 --listen-to 127.0.0.1 --locale C.UTF-8 -d nodetach -L %h/.local/share/omarchy-dict/dictd.log
+Restart=on-failure
+
+[Install]
+WantedBy=default.target

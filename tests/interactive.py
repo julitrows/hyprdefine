@@ -32,6 +32,8 @@ def main():
         # gum panics without a window size, so give the child a real one.
         fcntl.ioctl(0, termios.TIOCSWINSZ, struct.pack("HHHH", 40, 100, 0, 0))
         os.environ["TERM"] = "xterm-256color"
+        # Offering to install languages would stand between q and the prompt.
+        os.environ["OMARCHY_DICT_NO_OFFER"] = "1"
         os.execv(DEFINE, [DEFINE, *flags])
 
     def read(seconds):

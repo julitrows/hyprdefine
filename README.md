@@ -1,17 +1,21 @@
 # omarchy-dict
 
 A dictionary on a keystroke for [Omarchy](https://omarchy.org/), or any Arch
-install running Hyprland. Press **Super + Alt + D**, type a word and read its
-definitions, in every language you've installed, in a floating terminal.
+install running Hyprland. Press **Super + Alt + D**, type a word in any
+language and read what it means, in a floating terminal.
 
 ![Looking up "serendipity" in English and "ñandú" in Spanish](docs/demo.gif)
 
-You choose the languages when you install. Each one gets:
+There's nothing to choose up front. Each lookup searches the web for every
+language that has the word, and then offers to install those languages, so
+the next lookup works offline and shows definitions in the word's own
+language:
 
-| Language  | Definitions                                     | Translations                                 |
-| --------- | ----------------------------------------------- | -------------------------------------------- |
-| English   | Webster's 1913 (GCIDE), WordNet, Moby thesaurus | to every other installed language (FreeDict) |
-| Any other | that language's Wiktionary                      | to every other installed language (FreeDict) |
+|                    | Not installed                     | Installed                                          |
+| ------------------ | --------------------------------- | -------------------------------------------------- |
+| English            | Webster's 1913, WordNet and Moby thesaurus from dict.org | the same, with Webster's offline   |
+| Any other language | English meanings from Wiktionary  | that language's Wiktionary, offline                 |
+| Translations       | —                                 | between every pair of installed languages (FreeDict) |
 
 The other languages are Bulgarian, Catalan, Chinese, Czech, Danish, Dutch,
 Esperanto, Finnish, French, German, Greek, Italian, Japanese, Korean, Latin,
@@ -19,9 +23,9 @@ Lithuanian, Norwegian, Polish, Portuguese, Romanian, Russian, Spanish, Swedish,
 Thai, Turkish and Ukrainian: everything [reader.dict](https://www.reader-dict.com)
 publishes for DICT servers. Not every pair has a FreeDict translation.
 
-Everything runs through [`dict`](https://github.com/cheusov/dictd) and a local
-`dictd` server. WordNet, the thesaurus and translations that aren't packaged
-come from dict.org, so lookups work offline and get richer online.
+Once a word is in a language you've installed, only your languages are shown
+in full, and the rest are listed as "Also in: …". Installed dictionaries are
+served by your own `dictd`, so adding one never asks for a password.
 
 ## Install
 
@@ -31,26 +35,21 @@ cd ~/code/omarchy-dict
 ./install.sh
 ```
 
-The installer asks which languages you want, starting with English and
-Spanish ticked. To skip the question, pass their codes from `lib/languages`:
-`./install.sh --languages=en,fr,de`. Run it again to change them; dropping a
-language removes its dictionary.
-
 The installer:
 
-- installs `dictd` and `wl-clipboard` (to read the selection), and enables the
-  local `dictd` server
-- installs from the AUR `dict-gcide` for English, and the prebuilt FreeDict
-  translations (`dict-freedict-*-bin`) between your languages where they exist
-- for each language other than English, downloads its dictionary from
-  reader.dict, converts it to plain text and installs it to
-  `/usr/local/share/dictd`, registered as `<code>-<code>` in
-  `/etc/dict/dictd.conf`. Each takes a minute or two
-- saves your languages in `~/.config/omarchy-dict/languages`
+- installs `dictd`, `wl-clipboard` (to read the selection), `gum` and
+  `libnotify`, and `dict-gcide` from the AUR for offline English
+- links `systemd/omarchy-dict.service`, a user-level `dictd` for your
+  dictionaries, into `~/.config/systemd/user` and enables it
+- moves dictionaries an earlier version installed system-wide into
+  `~/.local/share/omarchy-dict`
 - links `bin/define` to `~/.local/bin/define`
 - links the Claude Code skill into `~/.claude/skills`, if you use Claude Code
 - appends a `dofile(...)` line to `~/.config/hypr/hyprland.lua` that loads
   `hypr/dictionary.lua`
+
+To install languages straight away, pass their codes from `lib/languages`:
+`./install.sh --languages=en,es,fr`.
 
 Outside Omarchy it uses `pacman`, plus `yay` or `paru` for the AUR, and
 installs `xdg-terminal-exec` to open your default terminal. Hyprland must use
@@ -62,20 +61,26 @@ The repo stays the source of truth, so edits here take effect after a
 `hyprctl reload`. Don't move the repo after installing; if you do, run
 `./uninstall.sh` and `./install.sh` again.
 
-reader.dict publishes new builds twice a month. To pick them up, run
-`./install.sh --update`.
-
 ## Usage
 
-- **Super + Alt + D** opens the prompt. Type a word and press Enter to see its
-  definitions and translations in every installed language, each under its
-  own heading, then `q` to get back to the prompt. Press Enter on an empty
-  prompt to close it.
+- **Super + Alt + D** opens the prompt. Type a word and press Enter, then `q`
+  to get back to the prompt. Press Enter on an empty prompt to close it.
 - **Super + Alt + W** looks up the text you've selected, and `q` closes it.
   Select a word by highlighting it; it doesn't need to be copied. With nothing
   selected, it opens the prompt.
+- After a lookup, the popup offers to install the languages it showed that you
+  don't have. Pick them with `x` and press Enter; they install in the
+  background, with a notification when they're ready. Languages you don't pick
+  aren't offered again, and Esc asks next time instead.
+- **Managing languages**: type `:languages` at the prompt, or run
+  `define --languages`, to add, remove or update languages, or to have
+  declined ones offered again. Dictionaries live in
+  `~/.local/share/omarchy-dict`.
 - From any terminal: `define serendipity`, `define --es ñandú` to search one
   language, or `define --selection` for the selected text.
+
+Lookups send the word to Wikimedia and dict.org. Without a network, only
+installed languages work.
 
 ## Claude Code
 
@@ -99,13 +104,15 @@ check that a key is free with `omarchy menu keybindings --print`, or call
 ./uninstall.sh
 ```
 
-This removes the link, the keybindings, the dictionaries it built and the
-saved languages, and prints the command to remove the packages too.
+This removes the link, the keybindings, the dictionary server, every
+downloaded dictionary and your language choices, and prints the command to
+remove the packages too.
 
 ## Credits
 
-The definitions in languages other than English come from
-[Wiktionary](https://www.wiktionary.org/) (CC BY-SA), packaged by
+Definitions in languages other than English come from
+[Wiktionary](https://www.wiktionary.org/) (CC BY-SA): English meanings through
+its API, and each language's own Wiktionary packaged by
 [reader.dict](https://www.reader-dict.com). Translations come from
-[FreeDict](https://freedict.org/). They're downloaded at install time and
-aren't part of this repo.
+[FreeDict](https://freedict.org/). They're downloaded when you look words up
+or install a language, and aren't part of this repo.

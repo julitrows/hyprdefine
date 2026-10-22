@@ -26,21 +26,22 @@ Tell the user what you found, including anything missing, before writing code.
 
 - **From reader.dict**: add a line to `lib/languages` with the reader.dict
   code, the FreeDict code and the language's own name for itself, in
-  alphabetical order by code after English. `install.sh`, `uninstall.sh` and
-  `define` pick it up from there, including its AUR translation packages.
-- **From another source**: add an install step to `install.sh` alongside
-  `install_language`, guarded by `has <code>` and removed by
-  `remove_language` when it isn't chosen, and give it a case in
-  `databases_for` in `bin/define`, the way English uses GCIDE. Keep
+  alphabetical order by code after English. `lib/dictionaries`, `define`,
+  `lib/wiktionary.py` and `uninstall.sh` pick it up from there, including its
+  FreeDict translations. If English Wiktionary uses a different code for it,
+  add it to `ALIASES` in `lib/wiktionary.py`.
+- **From another source**: add a build step to `install` in
+  `lib/dictionaries` alongside `build_language`, make `remove` delete its
+  files, and give it a case in `databases_for` in `bin/define`, the way
+  English uses GCIDE. Keep
   `"local remote"` pairs, with `-` for a side that doesn't exist.
 - **README.md**: add it to the list of languages, and to the credits if the
   source is new.
 
-The keybindings don't change: every key searches all installed languages.
+The keybindings don't change: every lookup searches all languages.
 
 ## 3. Verify
 
-Run the `test-define` skill, pointing `define` at a scratch config that
-includes the new code. The user has to run `./install.sh --languages=...`
-themselves, since it uses `sudo`. Then check `define --<code> <word>` against
-the installed database.
+Run the `test-define` skill, installing the new code into a scratch home as
+it describes, and check `define --<code> <word>` both before (Wiktionary) and
+after (the local dictionary) installing it.

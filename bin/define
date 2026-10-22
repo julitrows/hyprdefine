@@ -1,40 +1,60 @@
 #!/bin/bash
 
-# Look up words with dict(1) in every installed language at once. Pass a word to
-# look it up once, or run with no arguments to keep prompting until an empty
-# word is entered.
+# Look a word up in every language that has it. Pass a word to look it up
+# once, or run with no arguments to keep prompting until an empty word is
+# entered.
 #
-# Usage: define [--<code>] [--selection] [word...]
+# Usage: define [--<code>] [--selection] [--languages] [word...]
 #   --<code>     search only that language, such as --es or --fr
 #   --selection  look up the selected text and quit, or prompt if nothing is
 #                selected
+#   --languages  add, remove or update the installed languages
 #
-# The installed languages are listed in ~/.config/omarchy-dict/languages, which
-# install.sh writes; the codes and names come from lib/languages.
+# Installed languages (listed in ~/.config/omarchy-dict/languages) are searched
+# on the local dictionary server, with their translations to each other. Every
+# other language comes from English Wiktionary, as English meanings. When the
+# word is in an installed language, only those are shown in full and the rest
+# are listed as "also in"; otherwise every language that has it is shown. In
+# the popup, define then offers to install the languages it showed.
 
 LIB="$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/../lib"
+CONFIG="${XDG_CONFIG_HOME:-$HOME/.config}/omarchy-dict"
+LOG="$HOME/.local/share/omarchy-dict/install.log"
+# lib/dictionaries' user-level dictd, from systemd/omarchy-dict.service.
+PORT=2629
 
+LANGUAGES=()
 declare -A FREEDICT NAME
 while read -r code freedict name; do
   [[ -z $code || $code == \#* ]] && continue
+  LANGUAGES+=("$code")
   FREEDICT[$code]=$freedict
   NAME[$code]=$name
 done <"$LIB/languages"
 
-languages=(en es)
-read -r -a languages 2>/dev/null <"${XDG_CONFIG_HOME:-$HOME/.config}/omarchy-dict/languages"
+installed=()
+read -r -a installed 2>/dev/null <"$CONFIG/languages"
+declined=()
+read -r -a declined 2>/dev/null <"$CONFIG/declined"
 
-searched=("${languages[@]}")
+contains() {
+  local item=$1
+  shift
+  [[ " $* " == *" $item "* ]]
+}
+
+only=""
 selection=false
 while [[ ${1:-} == --* ]]; do
   case $1 in
     --selection) selection=true ;;
+    --languages) exec "$LIB/dictionaries" menu ;;
     *)
       if [[ -z ${NAME[${1#--}]:-} ]]; then
         echo "define: unknown option $1" >&2
         exit 2
       fi
-      searched=("${1#--}")
+      only=${1#--}
       ;;
   esac
   shift
@@ -52,7 +72,8 @@ databases_for() {
   else
     echo "$1-$1 -"
   fi
-  for other in "${languages[@]}"; do
+  contains "$1" "${installed[@]}" || return 0
+  for other in "${installed[@]}"; do
     to=${FREEDICT[$other]:-}
     [[ $other == "$1" || -z $to ]] || echo "$from-$to fd-$from-$to"
   done
@@ -60,7 +81,9 @@ databases_for() {
 
 # Print a database's definitions without dict's "N definitions found" banner.
 query() {
-  dict -h "$1" -d "$2" -- "$3" 2>/dev/null | sed '1{/definitions\? found$/{N;d}}'
+  local server=(-h dict.org)
+  [[ $1 == local ]] && server=(-h localhost -p "$PORT")
+  dict "${server[@]}" -d "$2" -- "$3" 2>/dev/null | sed '1{/definitions\? found$/{N;d}}'
   return "${PIPESTATUS[0]}"
 }
 
@@ -69,59 +92,91 @@ search() {
   read -r local_db remote_db <<<"$1"
 
   if [[ $local_db != - ]]; then
-    query localhost "$local_db" "$2"
+    query local "$local_db" "$2"
     status=$?
   fi
 
   # 0 is a match and 20/21 a miss; anything else means the local server or
   # database isn't there.
   if (( status != 0 && status != 20 && status != 21 )) && [[ $remote_db != - ]]; then
-    query dict.org "$remote_db" "$2"
+    query remote "$remote_db" "$2"
   fi
 }
 
-# Search every database of every searched language at once, then print the
-# results in order, under a heading per language when more than one matched.
-definitions() {
-  local results code database file i=0 matched=()
-  results=$(mktemp -d)
+# Search for a word and write what to show to $work/out. Sets offer to the
+# languages shown in full that aren't installed or declined.
+collect() {
+  local word=$1 code database file i=0 found=() shown=() also=() yours=()
+  work=$(mktemp -d)
+  mkdir "$work/wiki"
 
-  # Number the files across languages, zero-padded so a glob keeps the order.
-  for code in "${searched[@]}"; do
-    mkdir "$results/$code"
+  # Installed languages' dictionaries, plus English's online ones, which
+  # replace Wiktionary's English meanings whenever English is shown.
+  for code in "${LANGUAGES[@]}"; do
+    [[ -z $only || $code == "$only" ]] || continue
+    [[ $code == en ]] || contains "$code" "${installed[@]}" || continue
+    mkdir "$work/$code"
     while read -r database; do
-      printf -v file '%s/%s/%03d' "$results" "$code" "$i"
+      printf -v file '%s/%s/%03d' "$work" "$code" "$i"
       i=$((i + 1))
-      search "$database" "$1" >"$file" </dev/null &
+      search "$database" "$word" >"$file" </dev/null &
     done < <(databases_for "$code")
   done
+  python3 -I "$LIB/wiktionary.py" "$word" "$LIB/languages" "$work/wiki" 2>/dev/null &
   wait
 
-  for code in "${searched[@]}"; do
-    for file in "$results/$code"/*; do
-      [[ -s $file ]] && cat "$file" && echo
-    done >"$results/$code.out"
-    [[ -s $results/$code.out ]] && matched+=("$code")
+  for code in "${LANGUAGES[@]}"; do
+    [[ -z $only || $code == "$only" ]] || continue
+    if [[ -d $work/$code ]]; then
+      for file in "$work/$code"/*; do
+        [[ -s $file ]] && cat "$file" && echo
+      done >"$work/$code.out"
+    fi
+    # English Wiktionary's own English entries are mostly names when GCIDE and
+    # WordNet don't have a word, so English only counts through those.
+    if [[ ! -s $work/$code.out ]]; then
+      [[ $code != en ]] && mv "$work/wiki/$code" "$work/$code.out" 2>/dev/null || continue
+    fi
+    found+=("$code")
+    ! contains "$code" "${installed[@]}" || yours+=("$code")
   done
 
-  for code in "${matched[@]}"; do
-    if (( ${#matched[@]} > 1 )); then
+  if [[ -n $only || ${#yours[@]} -eq 0 ]]; then
+    shown=("${found[@]}")
+  else
+    shown=("${yours[@]}")
+    for code in "${found[@]}"; do
+      contains "$code" "${yours[@]}" || also+=("${NAME[$code]}")
+    done
+  fi
+
+  offer=()
+  for code in "${shown[@]}"; do
+    contains "$code" "${installed[@]}" "${declined[@]}" || offer+=("$code")
+  done
+
+  for code in "${shown[@]}"; do
+    if (( ${#shown[@]} > 1 )); then
       printf '%s\n%s\n\n' "${NAME[$code]}" "${NAME[$code]//?/═}"
     fi
-    cat "$results/$code.out"
-  done
-  rm -r "$results"
+    cat "$work/$code.out"
+  done >"$work/out"
+  if (( ${#also[@]} )); then
+    printf 'Also in: %s\n' "$(IFS=,; echo "${also[*]}" | sed 's/,/, /g')" >>"$work/out"
+  fi
 }
 
-# Show a word's definitions in less. Pass definitions already fetched as the
-# second argument to skip searching again.
+# Show a word's definitions in less.
 lookup() {
-  local found=${2-} suggestions
+  local found suggestions
 
-  [[ -n $found ]] || found=$(definitions "$1")
+  collect "$1"
+  found=$(cat "$work/out")
+  rm -r "$work"
   if [[ -z $found ]]; then
     found="No definitions found for \"$1\""
-    if suggestions=$(dict -h localhost -m -s lev -- "$1" 2>/dev/null); then
+    if suggestions=$(dict -h localhost -p "$PORT" -m -s lev -- "$1" 2>/dev/null ||
+      dict -h dict.org -d wn -m -s lev -- "$1" 2>/dev/null); then
       found+=$'\n\nPerhaps you mean:\n'"$suggestions"
     fi
   fi
@@ -131,6 +186,37 @@ lookup() {
   less "${pager[@]}" --prompt="s$(sed 's/[?%\\:.]/\\&/g' <<<"$1") (q to $leave)" <<<"$found"
 }
 
+# Offer to install the languages in $offer. Picked ones install in the
+# background; the rest aren't offered again.
+offer_install() {
+  local code picked="" names=() install=() decline=()
+  (( ${#offer[@]} )) && [[ -t 0 && -z ${OMARCHY_DICT_NO_OFFER:-} ]] || return 0
+
+  for code in "${offer[@]}"; do names+=("${NAME[$code]}"); done
+  clear
+  if command -v gum >/dev/null; then
+    # Esc asks again next time.
+    picked=$(gum choose --no-limit --header "Install for offline lookups and definitions in their own language?
+x picks, Enter confirms. Languages you don't pick won't be offered again." "${names[@]}") || return 0
+  else
+    read -rp "Install ${names[*]} for offline lookups? [y/N] " picked
+    [[ $picked == [yY]* ]] && picked=$(printf '%s\n' "${names[@]}") || picked=""
+  fi
+
+  for code in "${offer[@]}"; do
+    if grep -qxF -e "${NAME[$code]}" <<<"$picked"; then install+=("$code"); else decline+=("$code"); fi
+  done
+  (( ${#decline[@]} )) && "$LIB/dictionaries" decline "${decline[@]}"
+  declined+=("${decline[@]}")
+  if (( ${#install[@]} )); then
+    mkdir -p "$(dirname "$LOG")"
+    setsid -f "$LIB/dictionaries" install --notify "${install[@]}" >>"$LOG" 2>&1 </dev/null
+    declined+=("${install[@]}")
+    echo "Installing in the background. A notification will say when it's ready."
+    sleep 2
+  fi
+}
+
 # The primary selection's first line, without surrounding punctuation or space.
 selected() {
   wl-paste --primary --no-newline 2>/dev/null | head -n1 |
@@ -138,7 +224,7 @@ selected() {
 }
 
 ask() {
-  local prompt="Define: " placeholder="Word to define (Enter on empty to quit)"
+  local prompt="Define: " placeholder="Word to define (Enter on empty to quit, :languages to manage)"
 
   if command -v gum >/dev/null; then
     gum input --placeholder "$placeholder" --prompt "$prompt"
@@ -163,11 +249,19 @@ leave="go back"
 if [[ $selection == true ]] && word=$(selected) && [[ -n $word ]]; then
   leave=close
   lookup "$word"
+  offer_install
   exit
 fi
 
 while word=$(ask) && [[ -n $word ]]; do
   clear
-  lookup "$word"
+  if [[ $word == :languages ]]; then
+    "$LIB/dictionaries" menu
+    read -r -a installed 2>/dev/null <"$CONFIG/languages"
+    read -r -a declined 2>/dev/null <"$CONFIG/declined"
+  else
+    lookup "$word"
+    offer_install
+  fi
   clear
 done
