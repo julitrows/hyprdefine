@@ -30,7 +30,8 @@ The installer:
 - installs `dictd`, `dict-gcide`, `dict-freedict-eng-spa-bin` and
   `dict-freedict-spa-eng-bin` (AUR) and enables the local `dictd` server.
   Outside Omarchy it uses `pacman`, plus `yay` or `paru` for the AUR, and
-  installs `xdg-terminal-exec` to open your default terminal
+  installs `xdg-terminal-exec` to open your default terminal. `wl-clipboard`
+  is installed everywhere, to read the selection
 - downloads the Spanish dictionary from reader.dict, converts it to plain text
   and installs it to `/usr/local/share/dictd`, registered as `es-es` in
   `/etc/dict/dictd.conf`
@@ -55,7 +56,12 @@ reader.dict publishes a new Spanish build twice a month. To pick one up, run
 - **Super + Alt + D** opens the English lookup and **Super + Shift + Alt + D**
   the Spanish one. Type a word and press Enter, then `q` to get back to the
   prompt. Press Enter on an empty prompt to close it.
-- From any terminal: `define serendipity` or `define --es ñandú`.
+- **Super + Alt + W** looks up the text you've selected, in
+  English or, if English has nothing, in Spanish. Press `q` to close it.
+  Select a word by highlighting it; it doesn't need to be copied. With nothing
+  selected, it opens the English prompt.
+- From any terminal: `define serendipity` or `define --es ñandú`, or
+  `define --selection` for the selected text.
 
 ## Claude Code
 

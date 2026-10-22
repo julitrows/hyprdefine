@@ -35,6 +35,8 @@ singular).
 
 - **Super + Alt + D**: English lookup in a floating terminal
 - **Super + Shift + Alt + D**: Spanish lookup
+- **Super + Alt + W**: looks up the selected text
+  (`define --selection`), in English or else Spanish. Needs `wl-clipboard`
 
 They're defined in `hypr/dictionary.lua` in the omarchy-dict repo, which is
 loaded from `~/.config/hypr/hyprland.lua` by a line ending in

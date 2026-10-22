@@ -60,9 +60,9 @@ fi
 
 echo "Installing dictionary packages..."
 if command -v omarchy >/dev/null; then
-  omarchy pkg add dictd python
+  omarchy pkg add dictd python wl-clipboard
 else
-  sudo pacman -S --needed --noconfirm dictd python xdg-terminal-exec
+  sudo pacman -S --needed --noconfirm dictd python wl-clipboard xdg-terminal-exec
 fi
 install_aur dict-gcide dict-freedict-eng-spa-bin dict-freedict-spa-eng-bin ||
   echo "Could not install the offline dictionaries from the AUR; define will use dict.org."

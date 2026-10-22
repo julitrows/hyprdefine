@@ -3,8 +3,11 @@
 # Look up words with dict(1). Pass a word to look it up once, or run with no
 # arguments to keep prompting until an empty word is entered.
 #
-# Usage: define [--es] [word...]
-#   --es  Spanish definitions and Spanish to English translations
+# Usage: define [--es] [--selection] [word...]
+#   --es         Spanish definitions and Spanish to English translations
+#   --selection  look up the selected text and quit, or prompt if nothing is
+#                selected; without --es, falls back to Spanish when English
+#                finds nothing
 
 # Databases to search, as "local remote" pairs: the local dictd server is used
 # when it has the database, and dict.org when it doesn't. A "-" means there is
@@ -12,16 +15,30 @@
 ENGLISH=("gcide gcide" "- wn" "- moby-thesaurus" "eng-spa fd-eng-spa")
 SPANISH=("es-es -" "spa-eng fd-spa-eng")
 
-databases=("${ENGLISH[@]}")
-prompt="Define: "
-placeholder="Word to define (Enter on empty to quit)"
+english() {
+  lang=en
+  databases=("${ENGLISH[@]}")
+  prompt="Define: "
+  placeholder="Word to define (Enter on empty to quit)"
+}
 
-if [[ ${1:-} == --es ]]; then
-  shift
+spanish() {
+  lang=es
   databases=("${SPANISH[@]}")
   prompt="Definir: "
   placeholder="Palabra (Enter vacío para salir)"
-fi
+}
+
+english
+selection=false
+while [[ ${1:-} == --* ]]; do
+  case $1 in
+    --es) spanish ;;
+    --selection) selection=true ;;
+    *) echo "define: unknown option $1" >&2; exit 2 ;;
+  esac
+  shift
+done
 
 # Print a database's definitions without dict's "N definitions found" banner.
 query() {
@@ -61,10 +78,12 @@ definitions() {
   rm -r "$results"
 }
 
+# Show a word's definitions in less. Pass definitions already fetched as the
+# second argument to skip searching again.
 lookup() {
-  local found suggestions
+  local found=${2-} suggestions
 
-  found=$(definitions "$1")
+  [[ -n $found ]] || found=$(definitions "$1")
   if [[ -z $found ]]; then
     found="No definitions found for \"$1\""
     if suggestions=$(dict -h localhost -m -s lev -- "$1" 2>/dev/null); then
@@ -74,7 +93,13 @@ lookup() {
 
   # The leading "s" picks less's short prompt, and the escapes keep prompt
   # syntax such as "?" and "." in the word literal.
-  less "${pager[@]}" --prompt="s$(sed 's/[?%\\:.]/\\&/g' <<<"$1") (q to go back)" <<<"$found"
+  less "${pager[@]}" --prompt="s$(sed 's/[?%\\:.]/\\&/g' <<<"$1") (q to $leave)" <<<"$found"
+}
+
+# The primary selection's first line, without surrounding punctuation or space.
+selected() {
+  wl-paste --primary --no-newline 2>/dev/null | head -n1 |
+    sed 's/^[^[:alnum:]]*//; s/[^[:alnum:]]*$//'
 }
 
 ask() {
@@ -87,12 +112,29 @@ ask() {
 
 if (( $# > 0 )); then
   pager=(--quit-if-one-screen)
+  leave=quit
   lookup "$*"
   exit
 fi
 
-# Keep the pager open even for short entries, or the prompt's clear wipes them.
-pager=()
+# Keep the pager open even for short entries, or the prompt's clear wipes them,
+# and clear the screen so short entries are drawn from the top rather than
+# scrolled up from the bottom, without "~" on the empty lines below them.
+pager=(--clear-screen --tilde)
+leave="go back"
+
+if [[ $selection == true ]] && word=$(selected) && [[ -n $word ]]; then
+  found=$(definitions "$word")
+  if [[ -z $found && $lang == en ]]; then
+    spanish
+    found=$(definitions "$word")
+    [[ -n $found ]] || english
+  fi
+  leave=close
+  lookup "$word" "$found"
+  exit
+fi
+
 while word=$(ask) && [[ -n $word ]]; do
   clear
   lookup "$word"

@@ -1,7 +1,11 @@
 # omarchy-dict
 
 Super + Alt + D (English) and Super + Shift + Alt + D (Spanish) open a floating,
-themed terminal for looking words up with `dict` on Omarchy.
+themed terminal for looking words up with `dict` on Omarchy or plain Hyprland.
+Super + Alt + W runs `define --selection`, which looks up the
+primary selection (via `wl-paste --primary`) in English, falls back to Spanish
+when English finds nothing, and closes when its pager does. With nothing
+selected it falls through to the prompt loop.
 
 ## Layout
 
@@ -46,8 +50,10 @@ on dict.org.
 - **less prompts**: `--prompt=` treats the first letter as a prompt-type
   selector (`h`, `s`, `m`, `M`, `=`, `w`), and `?`, `%`, `\`, `:` and `.` are
   prompt syntax. Keep the leading `s` and the escaping in `lookup`.
-- **Short entries**: in the prompt loop, `less` must not use
-  `--quit-if-one-screen`, or the following `clear` wipes the definition.
+- **Short entries**: in the prompt loop and `--selection`, `less` must not use
+  `--quit-if-one-screen`, or the following `clear` (or the window closing)
+  wipes the definition. It does use `--clear-screen`, or short entries are
+  drawn at the bottom of the window.
 - **gum panics without a window size.** Any pty test must set one.
 - **Spanish data**: reader.dict's DICT.org index isn't sorted the way `dictd`
   searches, and its entries are single lines of HTML, which `dictd` truncates.

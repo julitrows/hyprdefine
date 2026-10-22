@@ -12,6 +12,7 @@ if o and o.bind then
 
   o.bind("SUPER + ALT + D", "Dictionary", launch)
   o.bind("SUPER + SHIFT + ALT + D", "Spanish dictionary", launch .. " --es")
+  o.bind("SUPER + ALT + W", "Define selection", launch .. " --selection")
 else
   -- Plain Hyprland: open the default terminal and float it the way Omarchy's
   -- floating-window tag does.
@@ -21,4 +22,5 @@ else
 
   hl.bind("SUPER + ALT + D", hl.dsp.exec_cmd(launch), { description = "Dictionary" })
   hl.bind("SUPER + SHIFT + ALT + D", hl.dsp.exec_cmd(launch .. " --es"), { description = "Spanish dictionary" })
+  hl.bind("SUPER + ALT + W", hl.dsp.exec_cmd(launch .. " --selection"), { description = "Define selection" })
 end
