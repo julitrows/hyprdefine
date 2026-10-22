@@ -40,7 +40,8 @@ reading everything. To query one database directly:
 FreeDict pairs such as `eng-spa`), and `dict -h dict.org -d <db> <word>` for
 `wn`, `moby-thesaurus` and the `fd-*` translations.
 
-If nothing is found, it prints "No definitions found" with spelling
+Installed languages also match the word with other accents, so `tropelia`
+finds `tropelía`. If nothing is found, it prints "No definitions found" with spelling
 suggestions. Try the suggestion or the base form of the word (infinitive or
 singular).
 

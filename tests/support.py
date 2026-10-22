@@ -26,17 +26,20 @@ LIB = os.path.join(REPO, "lib", "hyprdefine")
 #   {"servers": {"localhost:2629": {"es-es": {"casa": "..."}}, "dict.org:2628": {...}},
 #    "matches": {"wrod": ["word"]}}
 # Unknown servers exit 41 (no connection), unknown databases 39, and missing
-# words 20, as dict does. Every query is appended to HYPRDEFINE_TEST_DICT_LOG.
+# words 20, as dict does. A "-s re" match searches the headwords, printing
+# "host<TAB>port<TAB>db<TAB>word" lines as "-f" does. Every query is appended
+# to HYPRDEFINE_TEST_DICT_LOG.
 FAKE_DICT = r'''#!/usr/bin/env python3
-import json, os, sys
-args, host, port, db, match, words = sys.argv[1:], "dict.org", "2628", None, False, []
+import json, os, re, sys
+args, host, port, db, match, strategy, words = sys.argv[1:], "dict.org", "2628", None, False, None, []
 while args:
     arg = args.pop(0)
     if arg == "-h": host = args.pop(0)
     elif arg == "-p": port = args.pop(0)
     elif arg == "-d": db = args.pop(0)
     elif arg == "-m": match = True
-    elif arg == "-s": args.pop(0)
+    elif arg == "-s": strategy = args.pop(0)
+    elif arg == "-f": pass
     elif arg == "--": words = args; break
     else: words.append(arg)
 word = " ".join(words)
@@ -46,6 +49,14 @@ with open(os.environ["HYPRDEFINE_TEST_DICT_LOG"], "a") as log:
 server = fixture["servers"].get(f"{host}:{port}")
 if server is None:
     sys.exit(41)
+if db and db not in server:
+    sys.exit(39)
+if match and strategy == "re":
+    found = [(d, w) for d in ([db] if db else server) for w in server[d] if re.search(word, w, re.I)]
+    if not found:
+        sys.exit(20)
+    print("\n".join(f"{host}\t{port}\t{d}\t{w}" for d, w in found))
+    sys.exit(0)
 if match:
     found = fixture.get("matches", {}).get(word)
     if not found:
@@ -53,8 +64,6 @@ if match:
     print("\n".join(found))
     sys.exit(0)
 databases = [db] if db else list(server)
-if db and db not in server:
-    sys.exit(39)
 entries = [server[d][word.lower()] for d in databases if word.lower() in server[d]]
 if not entries:
     sys.exit(20)

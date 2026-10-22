@@ -64,11 +64,62 @@ searched() {
   if [[ -n $only ]]; then echo "$only"; else echo "${LANGUAGES[@]}"; fi
 }
 
+# Letters that may carry marks, and the marked forms each stands for.
+ACCENTS=(a áàâäãåāăą c çčć d ď e éèêëēěę g ğ i íìîïīı l ł n ñńň o óòôöõøōő
+  r ř s śšşș t ťţț u úùûüūůű y ýÿ z źżž)
+
+# A POSIX regex matching the word with or without marks on its letters:
+# "arbol" and "árbol" both give ^[aáàâäãåāăą]rb[oóòôöõøōő]l$.
+accent_pattern() {
+  local LC_ALL=C.UTF-8 word=${1,,} pattern="" char base i k
+  for (( i = 0; i < ${#word}; i++ )); do
+    char=${word:i:1}
+    base=""
+    for (( k = 0; k < ${#ACCENTS[@]}; k += 2 )); do
+      if [[ $char == "${ACCENTS[k]}" || ${ACCENTS[k + 1]} == *"$char"* ]]; then
+        base=${ACCENTS[k]}
+        break
+      fi
+    done
+    if [[ -n $base ]]; then
+      pattern+="[$base${ACCENTS[k + 1]}]"
+    elif [[ $char == [][.\\^\$*+?\(\){}\|] ]]; then
+      pattern+="\\$char"
+    else
+      pattern+=$char
+    fi
+  done
+  echo "^$pattern\$"
+}
+
+# Up to three headwords in a local database that are the word with different
+# marks, such as "tropelía" for "tropelia".
+accented() {
+  local word=$2
+  dict -h localhost -p "$PORT" -d "$1" -f -m -s re -- "$(accent_pattern "$word")" 2>/dev/null |
+    cut -f4 | awk -v word="$word" 'NF && tolower($0) != tolower(word)' | head -n3
+}
+
+# Search all of a language's databases for a word in the background, one
+# numbered file each. i is gather's: incrementing it here, in the main shell,
+# keeps the numbers going (an increment in the job's redirect would be lost in
+# a subshell).
+queue() {
+  local code=$1 word=$2 database file
+  while read -r database; do
+    printf -v file '%s/%s/%03d' "$work" "$code" "$i"
+    i=$((i + 1))
+    search "$database" "$word" >"$file" </dev/null &
+  done < <(databases_for "$code")
+}
+
 # Query every source at once, then leave each language's result in
 # $work/<code>.out. Only English and installed languages have dictionaries to
-# query; the rest come from Wiktionary.
+# query; the rest come from Wiktionary. An installed language that misses the
+# word is searched again for it with other marks, so "tropelia" finds
+# "tropelía".
 gather() {
-  local word=$1 code database file i=0
+  local word=$1 code database variant file i=0
 
   mkdir "$work/wiktionary"
   "${WIKTIONARY[@]}" "$word" "$LIB/languages" "$work/wiktionary" 2>/dev/null &
@@ -76,13 +127,18 @@ gather() {
   for code in $(searched); do
     [[ $code == en ]] || contains "$code" "${installed[@]}" || continue
     mkdir "$work/$code"
-    while read -r database; do
-      # Numbered in the main shell: an increment in the background job's
-      # redirect would happen in a subshell and be lost.
-      printf -v file '%s/%s/%03d' "$work" "$code" "$i"
-      i=$((i + 1))
-      search "$database" "$word" >"$file" </dev/null &
-    done < <(databases_for "$code")
+    queue "$code" "$word"
+  done
+  wait
+
+  for code in $(searched); do
+    contains "$code" "${installed[@]}" && [[ -d $work/$code ]] || continue
+    found_in "$code" && continue
+    read -r database _ < <(databases_for "$code")
+    [[ $database != - ]] || continue
+    while read -r variant; do
+      queue "$code" "$variant"
+    done < <(accented "$database" "$word")
   done
   wait
 
@@ -98,6 +154,15 @@ gather() {
       mv "$work/wiktionary/$code" "$work/$code.out"
     fi
   done
+}
+
+# Whether any of a language's searches so far found something.
+found_in() {
+  local file
+  for file in "$work/$1"/*; do
+    [[ -s $file ]] && return 0
+  done
+  return 1
 }
 
 # Set shown, also and offer from what gather found. When an installed language

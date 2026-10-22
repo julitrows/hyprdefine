@@ -60,6 +60,9 @@ terminal; elsewhere it's your default terminal, floated and centred.
 | `hyprdefine casa` | Look a word up from any terminal. `define casa` does the same. |
 | `hyprdefine --es casa` | Look in one language only, by code. |
 
+Accents are optional in installed languages: `tropelia` finds `tropelía`, and
+`cigueña` finds `cigüeña`.
+
 After a lookup, the popup offers to install languages it showed that you don't
 have. Pick them with `x` and press Enter: they download and build in the
 background, and a notification says when they're ready. Languages you don't

@@ -92,6 +92,13 @@ dict.org is only asked when your server can't answer:
 All queries run in parallel; each writes a numbered file, so the output keeps
 a stable order.
 
+When an installed language has no entry for the word, hyprdefine asks the
+local server for headwords that are the same word with other marks (a `re`
+match such as `^[tťţț][rř][oó…]p[eé…][lł][ií…][aá…]$`) and searches up to
+three of them the same way, translations included. So `tropelia` finds
+`tropelía`. This only runs on a miss and only against your own server, so it
+costs nothing on a hit and never sends anything to dict.org.
+
 ### Choose: what's shown in full
 
 ```mermaid
@@ -192,7 +199,7 @@ Wiktionary, reader.dict and FreeDict, and `systemctl`, `notify-send` and
 
 | File | Covers |
 | --- | --- |
-| `test_lookup.py` | which sources are asked, what's shown, "Also in", fallbacks |
+| `test_lookup.py` | which sources are asked, what's shown, "Also in", fallbacks, accents |
 | `test_dictionaries.py` | installing, removing, checksums, notifications, the server |
 | `test_setup.py` | setup, teardown, idempotency, migration from omarchy-dict |
 | `test_popup.py` | the prompt loop, pager, `--selection` and install offer, in a pty |

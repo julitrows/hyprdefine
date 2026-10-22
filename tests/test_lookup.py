@@ -79,6 +79,34 @@ class LookupTest(Sandbox):
         self.assertIn("dict.org:2628 fd-spa-eng casa", queries, "a missing local database should")
         self.assertIn("house", output)
 
+    def test_an_installed_language_finds_the_word_with_its_marks(self):
+        self.install_state("en es")
+        self.local_server({"es-es": {"tropelía": entry("es-es", "tropelía", "Atropello, abuso.")},
+                           "eng-spa": {}, "spa-eng": {"tropelía": entry("spa-eng", "tropelía", "outrage")}})
+        self.wiktionary["tropelia"] = {"pt": wiktionary_entry("outrage")}
+        output = self.run_hyprdefine("tropelia").stdout
+        self.assertIn("Atropello, abuso.", output)
+        self.assertIn("outrage", output, "translations are searched for the marked word too")
+        self.assertTrue(output.rstrip().endswith("Also in: Português"))
+
+    def test_marks_are_matched_either_way_and_ignore_case(self):
+        self.install_state("es")
+        self.local_server({"es-es": {"cigüeña": entry("es-es", "cigüeña", "Ave zancuda.")}, "spa-eng": {}})
+        self.assertIn("Ave zancuda.", self.run_hyprdefine("--es", "CIGÜENA").stdout)
+
+    def test_an_exact_match_isnt_searched_again(self):
+        self.install_state("es")
+        self.local_server({"es-es": {"arbol": entry("es-es", "arbol", "Misspelling."),
+                                     "árbol": entry("es-es", "árbol", "Planta.")}, "spa-eng": {}})
+        output = self.run_hyprdefine("--es", "arbol").stdout
+        self.assertNotIn("Planta.", output)
+        self.assertFalse([q for q in self.dict_queries() if " match " in q])
+
+    def test_other_marks_are_literal(self):
+        self.install_state("es")
+        self.local_server({"es-es": {"axb": entry("es-es", "axb", "Wrong.")}, "spa-eng": {}})
+        self.assertNotIn("Wrong.", self.run_hyprdefine("--es", "a.b").stdout)
+
     def test_without_a_local_server_everything_goes_to_dict_org(self):
         self.install_state("en")
         output = self.run_hyprdefine("house").stdout
