@@ -3,6 +3,8 @@
 
 local define = os.getenv("HOME") .. "/.local/bin/define"
 
+local bind
+
 if o and o.bind then
   -- Omarchy: TUI.* app-ids are already tagged as terminals, so the window
   -- picks up the theme's terminal styling; the tag adds the standard float.
@@ -10,9 +12,9 @@ if o and o.bind then
 
   o.window("TUI.dictionary", { tag = "+floating-window" })
 
-  o.bind("SUPER + ALT + D", "Dictionary", launch)
-  o.bind("SUPER + SHIFT + ALT + D", "Spanish dictionary", launch .. " --es")
-  o.bind("SUPER + ALT + W", "Define selection", launch .. " --selection")
+  bind = function(keys, description, args)
+    o.bind(keys, description, launch .. args)
+  end
 else
   -- Plain Hyprland: open the default terminal and float it the way Omarchy's
   -- floating-window tag does.
@@ -20,7 +22,11 @@ else
 
   hl.window_rule({ match = { class = "TUI.dictionary" }, float = true, center = true, size = { 875, 600 } })
 
-  hl.bind("SUPER + ALT + D", hl.dsp.exec_cmd(launch), { description = "Dictionary" })
-  hl.bind("SUPER + SHIFT + ALT + D", hl.dsp.exec_cmd(launch .. " --es"), { description = "Spanish dictionary" })
-  hl.bind("SUPER + ALT + W", hl.dsp.exec_cmd(launch .. " --selection"), { description = "Define selection" })
+  bind = function(keys, description, args)
+    hl.bind(keys, hl.dsp.exec_cmd(launch .. args), { description = description })
+  end
 end
+
+-- define searches every installed language at once.
+bind("SUPER + ALT + D", "Dictionary", "")
+bind("SUPER + ALT + W", "Define selection", " --selection")

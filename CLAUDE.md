@@ -1,19 +1,20 @@
 # omarchy-dict
 
-Super + Alt + D (English) and Super + Shift + Alt + D (Spanish) open a floating,
-themed terminal for looking words up with `dict` on Omarchy or plain Hyprland.
-Super + Alt + W runs `define --selection`, which looks up the
-primary selection (via `wl-paste --primary`) in English, falls back to Spanish
-when English finds nothing, and closes when its pager does. With nothing
-selected it falls through to the prompt loop.
+Super + Alt + D opens a floating, themed terminal for looking words up with
+`dict` on Omarchy or plain Hyprland, in every language the user installed at
+once. Super + Alt + W runs `define --selection`, which looks up the primary
+selection (via `wl-paste --primary`) and closes when its pager does. With
+nothing selected it falls through to the prompt loop.
 
 ## Layout
 
 - `bin/define`: the lookup command and its prompt loop. Bash.
 - `hypr/dictionary.lua`: keybindings and window rule, loaded by a `dofile`
   line that `install.sh` appends to `~/.config/hypr/hyprland.lua`.
-- `lib/spanish-dict.py`: converts reader.dict's Spanish download into
-  `dictfmt -f` input. Standard library only.
+- `lib/languages`: the supported languages (reader.dict code, FreeDict code,
+  native name), read by `install.sh`, `uninstall.sh` and `define`.
+- `lib/reader-dict.py`: converts a reader.dict download into `dictfmt -f`
+  input. Standard library only, and works for every language.
 - `install.sh` / `uninstall.sh`: idempotent setup and teardown.
 - `tests/interactive.py`: drives `define`'s prompt loop in a pseudo-terminal.
 - `skills/omarchy-dict/`: end-user Claude Code skill, linked into
@@ -22,6 +23,23 @@ selected it falls through to the prompt loop.
 The installed `~/.local/bin/define` is a symlink to this repo, so edits to
 `bin/define` are live immediately. Edits to `hypr/dictionary.lua` need
 `hyprctl reload`.
+
+## Languages
+
+`install.sh` asks for the languages (or takes `--languages=en,fr`) and saves
+their codes, in `lib/languages` order, to `~/.config/omarchy-dict/languages`.
+A missing file means English and Spanish, the only languages before this
+existed. `define` reads it and searches every language at once, or one with
+`--<code>`; the keybindings don't depend on it.
+
+For each language, `define` searches its definitions (GCIDE, WordNet and Moby
+for English, the reader.dict build `<code>-<code>` for the rest) and a FreeDict
+translation database to every other installed language, `<from>-<to>` by
+FreeDict code. Results are grouped under a heading per language when more than
+one matched. A pair FreeDict doesn't have just finds nothing.
+
+`install.sh` installs a `dict-freedict-<from>-<to>-bin` AUR package for each
+pair that has one, checked through the AUR RPC; the rest come from dict.org.
 
 ## How lookups work
 
@@ -37,9 +55,10 @@ on dict.org.
 ## Gotchas
 
 - **Omarchy and plain Hyprland on Arch are both supported.** Only Hyprland's
-  Lua config is, not `hyprland.conf`. `hypr/dictionary.lua` has two branches,
-  picked by whether Omarchy's `o.bind` helper exists; keep their keys and
-  window rules in step. Read `/usr/share/omarchy/` freely but never edit it.
+  Lua config is, not `hyprland.conf`. `hypr/dictionary.lua` picks a `bind`
+  helper and window rule by whether Omarchy's `o.bind` exists, then declares
+  the keys once; keep the two window rules in step. Read
+  `/usr/share/omarchy/` freely but never edit it.
 - On Omarchy, launch through `omarchy-launch-tui --app-id=TUI.dictionary`,
   whose `TUI.*` app-id gets Omarchy's terminal styling, and float with the
   `floating-window` tag. On plain Hyprland, launch through
@@ -55,12 +74,13 @@ on dict.org.
   wipes the definition. It does use `--clear-screen`, or short entries are
   drawn at the bottom of the window.
 - **gum panics without a window size.** Any pty test must set one.
-- **Spanish data**: reader.dict's DICT.org index isn't sorted the way `dictd`
+- **reader.dict data**: its DICT.org index isn't sorted the way `dictd`
   searches, and its entries are single lines of HTML, which `dictd` truncates.
-  That's why `lib/spanish-dict.py` re-renders everything and `dictfmt` builds
+  That's why `lib/reader-dict.py` re-renders everything and `dictfmt` builds
   a fresh index (`--utf8 --columns 0`). Don't install the download as is.
 - **Markers**: the `dofile` line ends in `-- omarchy-dict`, and the `dictd.conf`
-  block sits between `# omarchy-dict begin` and `# omarchy-dict end`. Use
+  block sits between `# omarchy-dict begin` and `# omarchy-dict end`.
+  `install.sh` rewrites the whole block every run, from the chosen languages. Use
   `grep -e` for patterns that start with `-`.
 - **Never commit dictionary data.** It's Wiktionary content (CC BY-SA)
   downloaded at install time.

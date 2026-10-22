@@ -1,0 +1,35 @@
+# Languages omarchy-dict can install, read by install.sh and bin/define.
+#
+# code: reader.dict's code, used for the download and the local database
+#       (<code>-<code>). English uses GCIDE, WordNet and Moby instead.
+# freedict: FreeDict's code, for translation databases such as eng-spa.
+# name: shown in the installer and as a heading above each language's results.
+#
+# code  freedict  name
+en      eng       English
+bg      bul       Български
+ca      cat       Català
+cs      ces       Čeština
+da      dan       Dansk
+de      deu       Deutsch
+el      ell       Ελληνικά
+eo      epo       Esperanto
+es      spa       Español
+fi      fin       Suomi
+fr      fra       Français
+it      ita       Italiano
+ja      jpn       日本語
+ko      kor       한국어
+la      lat       Latina
+lt      lit       Lietuvių
+nl      nld       Nederlands
+no      nor       Norsk
+pl      pol       Polski
+pt      por       Português
+ro      rom       Română
+ru      rus       Русский
+sv      swe       Svenska
+th      tha       ไทย
+tr      tur       Türkçe
+uk      ukr       Українська
+zh      zho       中文

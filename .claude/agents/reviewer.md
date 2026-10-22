@@ -24,11 +24,15 @@ Check:
    server doesn't have, so a local miss (20 or 21) mustn't trigger a remote
    query. Local and remote database names must be right.
 4. **Hyprland Lua.** Omarchy's `o.bind`/`o.window` helpers in the Omarchy
-   branch and raw `hl.*` calls in the plain-Hyprland branch, with the same keys
-   in both, no duplicate keys, and nothing written to `/usr/share/omarchy`.
-5. **Quoting and failure handling** in Bash under `set -euo pipefail`, and
+   branch and raw `hl.*` calls in the plain-Hyprland branch, keys declared
+   once through the shared `bind`, no duplicate keys, and nothing written to
+   `/usr/share/omarchy`.
+5. **Languages.** `lib/languages` is the only list of languages: `install.sh`,
+   `uninstall.sh` and `define` must read it rather than naming languages
+   themselves, apart from English's own databases.
+6. **Quoting and failure handling** in Bash under `set -euo pipefail`, and
    standard-library-only Python.
-6. **Docs.** README.md, CLAUDE.md and `skills/omarchy-dict/SKILL.md` must
+7. **Docs.** README.md, CLAUDE.md and `skills/omarchy-dict/SKILL.md` must
    match the behaviour.
 
 Run the read-only checks you can: `bash -n`, `luac -p`, `py_compile`, one-shot

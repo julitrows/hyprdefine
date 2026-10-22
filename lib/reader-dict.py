@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 
-# Convert reader.dict's Spanish DICT.org download into dictfmt -f input.
+# Convert one of reader.dict's DICT.org downloads into dictfmt -f input.
 #
 # The download stores each definition as a single line of HTML and its index
 # isn't sorted the way dictd searches, so lookups miss and long entries come
 # back cut off. Rendering the entries as wrapped plain text and letting dictfmt
 # write a fresh index fixes both.
 #
-# Usage: spanish-dict.py dictorg-es-es-noetym.zip | dictfmt -f --utf8 ... es-es
+# Usage: reader-dict.py dictorg-fr-fr-noetym.zip | dictfmt -f --utf8 ... fr-fr
 
 import gzip
 import sys

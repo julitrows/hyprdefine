@@ -1,44 +1,62 @@
 #!/bin/bash
 
-# Look up words with dict(1). Pass a word to look it up once, or run with no
-# arguments to keep prompting until an empty word is entered.
+# Look up words with dict(1) in every installed language at once. Pass a word to
+# look it up once, or run with no arguments to keep prompting until an empty
+# word is entered.
 #
-# Usage: define [--es] [--selection] [word...]
-#   --es         Spanish definitions and Spanish to English translations
+# Usage: define [--<code>] [--selection] [word...]
+#   --<code>     search only that language, such as --es or --fr
 #   --selection  look up the selected text and quit, or prompt if nothing is
-#                selected; without --es, falls back to Spanish when English
-#                finds nothing
+#                selected
+#
+# The installed languages are listed in ~/.config/omarchy-dict/languages, which
+# install.sh writes; the codes and names come from lib/languages.
 
-# Databases to search, as "local remote" pairs: the local dictd server is used
-# when it has the database, and dict.org when it doesn't. A "-" means there is
-# no such database on that side.
-ENGLISH=("gcide gcide" "- wn" "- moby-thesaurus" "eng-spa fd-eng-spa")
-SPANISH=("es-es -" "spa-eng fd-spa-eng")
+LIB="$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/../lib"
 
-english() {
-  lang=en
-  databases=("${ENGLISH[@]}")
-  prompt="Define: "
-  placeholder="Word to define (Enter on empty to quit)"
-}
+declare -A FREEDICT NAME
+while read -r code freedict name; do
+  [[ -z $code || $code == \#* ]] && continue
+  FREEDICT[$code]=$freedict
+  NAME[$code]=$name
+done <"$LIB/languages"
 
-spanish() {
-  lang=es
-  databases=("${SPANISH[@]}")
-  prompt="Definir: "
-  placeholder="Palabra (Enter vacío para salir)"
-}
+languages=(en es)
+read -r -a languages 2>/dev/null <"${XDG_CONFIG_HOME:-$HOME/.config}/omarchy-dict/languages"
 
-english
+searched=("${languages[@]}")
 selection=false
 while [[ ${1:-} == --* ]]; do
   case $1 in
-    --es) spanish ;;
     --selection) selection=true ;;
-    *) echo "define: unknown option $1" >&2; exit 2 ;;
+    *)
+      if [[ -z ${NAME[${1#--}]:-} ]]; then
+        echo "define: unknown option $1" >&2
+        exit 2
+      fi
+      searched=("${1#--}")
+      ;;
   esac
   shift
 done
+
+# A language's databases, as "local remote" pairs: the local dictd server is
+# used when it has the database, and dict.org when it doesn't. A "-" means
+# there is no such database on that side. Translations go to every other
+# installed language.
+databases_for() {
+  local other from=${FREEDICT[$1]} to
+
+  if [[ $1 == en ]]; then
+    printf '%s\n' "gcide gcide" "- wn" "- moby-thesaurus"
+  else
+    echo "$1-$1 -"
+  fi
+  for other in "${languages[@]}"; do
+    to=${FREEDICT[$other]:-}
+    [[ $other == "$1" || -z $to ]] || echo "$from-$to fd-$from-$to"
+  done
+}
 
 # Print a database's definitions without dict's "N definitions found" banner.
 query() {
@@ -62,18 +80,35 @@ search() {
   fi
 }
 
-# Search every database at once, then print the results in order.
+# Search every database of every searched language at once, then print the
+# results in order, under a heading per language when more than one matched.
 definitions() {
-  local results i
+  local results code database file i=0 matched=()
   results=$(mktemp -d)
 
-  for i in "${!databases[@]}"; do
-    search "${databases[$i]}" "$1" >"$results/$i" &
+  # Number the files across languages, zero-padded so a glob keeps the order.
+  for code in "${searched[@]}"; do
+    mkdir "$results/$code"
+    while read -r database; do
+      printf -v file '%s/%s/%03d' "$results" "$code" "$i"
+      i=$((i + 1))
+      search "$database" "$1" >"$file" </dev/null &
+    done < <(databases_for "$code")
   done
   wait
 
-  for i in "${!databases[@]}"; do
-    [[ -s $results/$i ]] && cat "$results/$i" && echo
+  for code in "${searched[@]}"; do
+    for file in "$results/$code"/*; do
+      [[ -s $file ]] && cat "$file" && echo
+    done >"$results/$code.out"
+    [[ -s $results/$code.out ]] && matched+=("$code")
+  done
+
+  for code in "${matched[@]}"; do
+    if (( ${#matched[@]} > 1 )); then
+      printf '%s\n%s\n\n' "${NAME[$code]}" "${NAME[$code]//?/═}"
+    fi
+    cat "$results/$code.out"
   done
   rm -r "$results"
 }
@@ -103,6 +138,8 @@ selected() {
 }
 
 ask() {
+  local prompt="Define: " placeholder="Word to define (Enter on empty to quit)"
+
   if command -v gum >/dev/null; then
     gum input --placeholder "$placeholder" --prompt "$prompt"
   else
@@ -124,14 +161,8 @@ pager=(--clear-screen --tilde)
 leave="go back"
 
 if [[ $selection == true ]] && word=$(selected) && [[ -n $word ]]; then
-  found=$(definitions "$word")
-  if [[ -z $found && $lang == en ]]; then
-    spanish
-    found=$(definitions "$word")
-    [[ -n $found ]] || english
-  fi
   leave=close
-  lookup "$word" "$found"
+  lookup "$word"
   exit
 fi
 
