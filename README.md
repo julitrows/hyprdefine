@@ -4,6 +4,8 @@ A dictionary on a keystroke for [Omarchy](https://omarchy.org/). Press
 **Super + Alt + D**, type a word and read its definition in a floating terminal
 that follows your theme. **Super + Shift + Alt + D** does the same in Spanish.
 
+![Looking up "serendipity" in English and "ñandú" in Spanish](docs/demo.gif)
+
 | Lookup  | Definitions                                    | Translations       |
 | ------- | ---------------------------------------------- | ------------------ |
 | English | Webster's 1913 (GCIDE), WordNet, Moby thesaurus | English → Spanish |
