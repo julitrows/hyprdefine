@@ -1,1 +1,6 @@
 __pycache__/
+# makepkg output from building packaging/PKGBUILD locally
+packaging/src/
+packaging/pkg/
+packaging/*.tar.*
+packaging/*.pkg.tar.*

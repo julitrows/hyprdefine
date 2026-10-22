@@ -1,0 +1,17 @@
+# hyprdefine's dictionary server: a user-level dictd for the dictionaries in
+# ~/.local/share/hyprdefine, listening on localhost only. `hyprdefine --setup`
+# enables it, and `hyprdefine --install` and `--remove` rewrite its config and
+# restart it.
+
+[Unit]
+Description=hyprdefine dictionary server
+Documentation=https://github.com/julitrows/hyprdefine
+# dictd won't start without a database, so wait until a language is installed.
+ConditionFileNotEmpty=%h/.local/share/hyprdefine/dictd.conf
+
+[Service]
+ExecStart=/usr/bin/dictd -c %h/.local/share/hyprdefine/dictd.conf -p 2629 --listen-to 127.0.0.1 --locale C.UTF-8 -d nodetach -L %h/.local/share/hyprdefine/dictd.log
+Restart=on-failure
+
+[Install]
+WantedBy=default.target

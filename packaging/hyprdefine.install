@@ -1,0 +1,14 @@
+post_install() {
+  echo "==> Run 'hyprdefine --setup' as your user (not root) to add the keybindings"
+  echo "    (Super + Alt + D and Super + Alt + W) and the dictionary server."
+}
+
+post_upgrade() {
+  echo "==> Run 'hyprdefine --setup' again if the keybindings stop working."
+}
+
+pre_remove() {
+  echo "==> If you haven't already, run 'hyprdefine --teardown' as each user to remove"
+  echo "    the keybindings and downloaded dictionaries. After removal, delete the line"
+  echo "    ending in '-- hyprdefine' from ~/.config/hypr/hyprland.lua by hand."
+}

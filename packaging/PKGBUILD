@@ -1,0 +1,25 @@
+# Maintainer: Julio AG <julio dot antequera dot galiano at gmail dot com>
+
+pkgname=hyprdefine
+pkgver=0.1.0
+pkgrel=1
+pkgdesc='Look words up in any language from a floating Hyprland popup'
+arch=(any)
+url='https://github.com/julitrows/hyprdefine'
+license=(MIT)
+depends=(bash curl dictd gum less libnotify python wl-clipboard xdg-terminal-exec)
+optdepends=('dict-gcide: offline English definitions (AUR)')
+checkdepends=(lua)
+install=hyprdefine.install
+source=("$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/v$pkgver.tar.gz")
+sha256sums=('SKIP')
+
+check() {
+  cd "$pkgname-$pkgver"
+  make test
+}
+
+package() {
+  cd "$pkgname-$pkgver"
+  make DESTDIR="$pkgdir" PREFIX=/usr install
+}

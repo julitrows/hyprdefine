@@ -1,137 +1,97 @@
-# omarchy-dict
+# hyprdefine
 
-Super + Alt + D opens a floating, themed terminal for looking words up with
-`dict` on Omarchy or plain Hyprland. It searches every language that has the
-word, online through Wiktionary and dict.org, and offers to install the
-languages it finds for offline use. Super + Alt + W runs `define --selection`,
-which looks up the primary selection (via `wl-paste --primary`) and closes
-when its pager does. With nothing selected it falls through to the prompt
-loop.
+A floating dictionary popup for Hyprland (themed on Omarchy). Super + Alt + D
+opens a prompt; Super + Alt + W looks up the selection. Each lookup searches
+every language that has the word (installed ones on a user-level `dictd`,
+English on dict.org, the rest through English Wiktionary's API) and then
+offers to install the languages it showed. Formerly omarchy-dict.
+
+Read [docs/architecture.md](docs/architecture.md) first: it has the diagrams
+and the reasoning. This file is the short version plus the pitfalls.
 
 ## Layout
 
-- `bin/define`: the lookup command, its prompt loop and the install offer.
-  Bash.
-- `lib/dictionaries`: installs, removes and updates languages, and runs the
-  `define --languages` menu. Bash, no sudo.
-- `lib/languages`: the supported languages (reader.dict code, FreeDict code,
-  native name), read by everything else.
-- `lib/wiktionary.py`: English Wiktionary's English meanings for a word, one
-  file per supported language that has it. Standard library only.
-- `lib/freedict.py`: finds FreeDict's dictd downloads in its catalogue.
-- `lib/reader-dict.py`: converts a reader.dict download into `dictfmt -f`
-  input. Standard library only, and works for every language.
-- `systemd/omarchy-dict.service`: the user-level `dictd`, linked into
-  `~/.config/systemd/user` by `install.sh`.
-- `hypr/dictionary.lua`: keybindings and window rule, loaded by a `dofile`
-  line that `install.sh` appends to `~/.config/hypr/hyprland.lua`.
-- `install.sh` / `uninstall.sh`: idempotent setup and teardown.
-- `tests/interactive.py`: drives `define`'s prompt loop in a pseudo-terminal.
-- `skills/omarchy-dict/`: end-user Claude Code skill, linked into
-  `~/.claude/skills` by `install.sh`.
+The repo mirrors the installed layout, so `make install` is a plain copy and
+`bin/hyprdefine` finds everything relative to its own real path:
 
-The installed `~/.local/bin/define` is a symlink to this repo, so edits to
-`bin/define` and `lib/` are live immediately. Edits to `hypr/dictionary.lua`
-need `hyprctl reload`.
+- `bin/hyprdefine`: the only executable. Dispatches on its first option and
+  sources what that job needs.
+- `lib/hyprdefine/common.sh`: paths, the language catalogue, state helpers.
+- `lib/hyprdefine/lookup.sh`: lookups (`gather`, `choose`, `render`), the
+  prompt loop and the install offer. Runs without `set -e`.
+- `lib/hyprdefine/dictionaries.sh`: `--install`, `--remove`, `--update`,
+  `--decline`, `--serve` and the `--languages` menu. Runs under
+  `set -eEuo pipefail`.
+- `lib/hyprdefine/setup.sh`: `--setup` and `--teardown`, everything per user.
+- `lib/hyprdefine/languages`: the 26 languages (reader.dict code, FreeDict
+  code, own name). The only list of languages; everything reads it.
+- `lib/hyprdefine/{wiktionary,freedict,reader-dict}.py`: standard-library
+  helpers.
+- `lib/systemd/user/hyprdefine.service`: the user-level `dictd` on
+  127.0.0.1:2629.
+- `share/hyprdefine/hyprland.lua`: the keys and window rule.
+- `share/hyprdefine/skill/`: the end-user Claude Code skill.
+- `packaging/`: the AUR PKGBUILD and install script (see docs/packaging.md).
+- `tests/`: `make test`.
 
-## Languages
+In this checkout, `~/.local/bin/hyprdefine` and `define` link here, so edits
+are live immediately; edits to `hyprland.lua` need `hyprctl reload`.
 
-Installed languages are listed in `~/.config/omarchy-dict/languages`, and ones
-the user said no to in `~/.config/omarchy-dict/declined`. Their dictionaries
-live in `~/.local/share/omarchy-dict/dictionaries`: `<code>-<code>` built from
-reader.dict, and FreeDict translations `<from>-<to>` (by FreeDict code)
-between every pair of installed languages, downloaded from freedict.org and
-checked against the catalogue's SHA-512. English has no download; installing
-it serves GCIDE from the `dict-gcide` package when that's there.
+## Rules
 
-`lib/dictionaries` writes `~/.local/share/omarchy-dict/dictd.conf` and
-restarts `omarchy-dict.service`, a `dictd` on 127.0.0.1:2629. `dictd` won't
-start without a database, so the unit has `ConditionFileNotEmpty` and
-`lib/dictionaries` stops it when nothing is installed. Installs take a lock,
-so a background install and the menu don't clash.
+- **No sudo outside `install.sh`.** Languages live in
+  `~/.local/share/hyprdefine` so the popup can install them in the background.
+- **`lib/hyprdefine/languages` is the only list of languages.** Nothing else
+  names one, apart from English's own databases (`gcide`, `wn`,
+  `moby-thesaurus`).
+- **Local first.** dict.org is only asked when the local server can't answer
+  (exit 39 or 41), never on a miss (20 or 21).
+- **Never write over something that isn't ours.** `setup.sh`'s `link` and
+  `ours` decide; keep using them.
+- **Read `/usr/share/omarchy/` freely, never edit it.** `hyprland.lua` uses
+  Omarchy's `o.bind`/`o.window` when they exist and raw `hl.*` otherwise; keep
+  both branches' window rules in step.
+- **Never commit dictionary data**: it's Wiktionary and FreeDict content.
 
-## How lookups work
+## Pitfalls already hit
 
-For one word, `define` queries in parallel:
-
-- each installed language's databases, as `"local remote"` pairs: the local
-  server first, and dict.org only when the local server doesn't have that
-  database. `dict` exits 0 on a match and 20 or 21 on a miss, and anything
-  else (39 is a missing database, 41 no server) means "not available
-  locally". Local names differ from dict.org's: `eng-spa` is `fd-eng-spa`.
-- English's dict.org dictionaries (GCIDE, WordNet, Moby), installed or not.
-- `lib/wiktionary.py`, for every other language.
-
-A language counts as having the word if its dictionaries matched, or, except
-for English, if Wiktionary has it. When an installed language has it, only
-installed languages are shown in full and the rest go on an "Also in:" line.
-Otherwise every language that has it is shown. With more than one shown, each
-gets a heading.
-
-In the popup (prompt loop and `--selection`), after the pager closes, `define`
-offers to install the languages it showed in full that aren't installed or
-declined. Picked ones install in the background (`setsid`, logging to
-`~/.local/share/omarchy-dict/install.log`, with a notification when done);
-unpicked ones are declined; Esc asks again next time. `OMARCHY_DICT_NO_OFFER=1`
-turns the offer off, which the tests do.
-
-## Gotchas
-
-- **Omarchy and plain Hyprland on Arch are both supported.** Only Hyprland's
-  Lua config is, not `hyprland.conf`. `hypr/dictionary.lua` picks a `bind`
-  helper and window rule by whether Omarchy's `o.bind` exists, then declares
-  the keys once; keep the two window rules in step. Read
-  `/usr/share/omarchy/` freely but never edit it.
-- On Omarchy, launch through `omarchy-launch-tui --app-id=TUI.dictionary`,
-  whose `TUI.*` app-id gets Omarchy's terminal styling, and float with the
-  `floating-window` tag. On plain Hyprland, launch through
-  `xdg-terminal-exec --app-id=TUI.dictionary` and set `float`, `center` and
-  `size` directly, matching that tag.
-- **Packages**: `install.sh` uses `omarchy pkg` when `omarchy` exists, and
-  otherwise `pacman` with `yay` or `paru` for `dict-gcide`.
+- **`dictfmt -f` swallows the first two headwords** as database info, so
+  `reader-dict.py` writes two header lines first.
+- **`read` returns 1 on an empty file**, which ends a `set -e` script; see
+  `load_state`.
+- **Counters in background jobs**: `$((i++))` in the redirect of a `&` job, or
+  inside `$(...)`, runs in a subshell and never increments.
+- **Bash regexes have no back-references.**
+- **`systemctl --user disable` deletes a linked unit file itself.**
+- **`set -e` is off inside `$(...)` and in an `if`/`||` condition**, so
+  functions called there don't stop on errors.
 - **gum 2 toggles with `x` or Tab**, not Space, in `gum choose --no-limit`.
+  **gum panics without a window size**, so pty tests set one.
 - **Wiktionary**: only English Wiktionary has the definition API (others
-  answer 501), so other languages get English meanings until installed.
-  Wikimedia wants a descriptive User-Agent. Its English entries for words
-  GCIDE and WordNet lack are mostly names, so English ignores them.
+  return 501). Its English entries for words GCIDE and WordNet lack are
+  mostly names, so English ignores them. Send a descriptive User-Agent.
+- **`dictd` won't start without a database**: the unit has
+  `ConditionFileNotEmpty`, and `serve` stops it when nothing is installed.
 - **less prompts**: `--prompt=` treats the first letter as a prompt-type
-  selector (`h`, `s`, `m`, `M`, `=`, `w`), and `?`, `%`, `\`, `:` and `.` are
-  prompt syntax. Keep the leading `s` and the escaping in `lookup`.
-- **Short entries**: in the prompt loop and `--selection`, `less` must not use
-  `--quit-if-one-screen`, or the following `clear` (or the window closing)
-  wipes the definition. It does use `--clear-screen`, or short entries are
-  drawn at the bottom of the window.
-- **gum panics without a window size.** Any pty test must set one.
-- **reader.dict data**: its DICT.org index isn't sorted the way `dictd`
-  searches, and its entries are single lines of HTML, which `dictd` truncates.
-  That's why `lib/reader-dict.py` re-renders everything and `dictfmt` builds
-  a fresh index (`--utf8 --columns 0`). Don't install the download as is.
-- **Background jobs in Bash**: a `$((i++))` in a redirect of a `&` job, or
-  inside `$(...)`, runs in a subshell and never increments. Bash regexes have
-  no back-references.
-- **Earlier versions** kept dictionaries in `/usr/local/share/dictd`,
-  registered between `# omarchy-dict begin` and `# omarchy-dict end` in
-  `/etc/dict/dictd.conf`. `install.sh` moves them into the user's data
-  directory, and `uninstall.sh` cleans up any that are left.
-- **Markers**: the `dofile` line ends in `-- omarchy-dict`. Use `grep -e` for
-  patterns that start with `-`.
-- **Never commit dictionary data.** It's Wiktionary and FreeDict content
-  downloaded at run time.
+  selector, and `?`, `%`, `\`, `:` and `.` are prompt syntax. Keep the leading
+  `s` and the escaping in `lookup`.
+- **Short entries**: in the popup, `less` must not use
+  `--quit-if-one-screen` (the following `clear` or the window closing wipes
+  the entry), and does use `--clear-screen` (or short entries sit at the
+  bottom).
+- **The user's shell may export `XDG_CONFIG_HOME`.** When pointing `HOME` at
+  a scratch directory by hand, unset or override it too, or you'll read the
+  real config. The test sandbox builds its environment from scratch.
 
 ## Testing
 
 ```bash
-bash -n bin/define lib/dictionaries install.sh uninstall.sh
-luac -p hypr/dictionary.lua
-define house; define casa; define --es casa # one-shot lookups
-python3 -I tests/interactive.py house casa serendipity etc.
-python3 -I tests/interactive.py --es casa ñandú
-hyprctl reload && hyprctl configerrors      # after Lua changes
+make check    # bash -n, luac -p, Python syntax
+make test     # everything, offline, ~30 s
+python3 -I -m unittest discover -s tests -p 'test_lookup.py'   # one file
 ```
 
-To try languages without touching the user's, run `lib/dictionaries` with
-`HOME` and `XDG_CONFIG_HOME` pointed at a scratch directory and stand-in
-`systemctl` and `notify-send` on `PATH`, then serve the scratch
-`dictd.conf` on port 2629 yourself. `install.sh` and `uninstall.sh` need
-`sudo`, so ask the user to run them in their own terminal rather than running
-them yourself.
+The tests never touch the network, the user's home or their server: see
+`tests/support.py`. Add a test with every behaviour change. `install.sh`,
+`uninstall.sh` and anything with `sudo` are for the user to run in their own
+terminal; `hyprdefine --setup` doesn't need `sudo`.

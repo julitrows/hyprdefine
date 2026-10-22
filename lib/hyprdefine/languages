@@ -1,9 +1,11 @@
-# Languages omarchy-dict can install, read by install.sh and bin/define.
+# The languages hyprdefine supports. Everything reads this list; nothing else
+# names a language.
 #
 # code: reader.dict's code, used for the download and the local database
 #       (<code>-<code>). English uses GCIDE, WordNet and Moby instead.
 # freedict: FreeDict's code, for translation databases such as eng-spa.
-# name: shown in the installer and as a heading above each language's results.
+# name: the language's name for itself, shown in headings, the install offer
+#       and the --languages menu.
 #
 # code  freedict  name
 en      eng       English

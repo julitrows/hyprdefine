@@ -1,118 +1,135 @@
-# omarchy-dict
+# hyprdefine
 
-A dictionary on a keystroke for [Omarchy](https://omarchy.org/), or any Arch
-install running Hyprland. Press **Super + Alt + D**, type a word in any
-language and read what it means, in a floating terminal.
+Look words up in any language from a floating popup on
+[Hyprland](https://hypr.land), themed to match on [Omarchy](https://omarchy.org/).
+Press **Super + Alt + D**, type a word, and read what it means.
 
 ![Looking up "serendipity" in English and "ñandú" in Spanish](docs/demo.gif)
 
-There's nothing to choose up front. Each lookup searches the web for every
-language that has the word, and then offers to install those languages, so
-the next lookup works offline and shows definitions in the word's own
-language:
+There's nothing to set up per language. Each lookup finds every language that
+has the word, then offers to install those languages so the next lookup works
+offline and explains the word in its own language:
 
-|                    | Not installed                     | Installed                                          |
-| ------------------ | --------------------------------- | -------------------------------------------------- |
-| English            | Webster's 1913, WordNet and Moby thesaurus from dict.org | the same, with Webster's offline   |
-| Any other language | English meanings from Wiktionary  | that language's Wiktionary, offline                 |
-| Translations       | —                                 | between every pair of installed languages (FreeDict) |
+|                   | Before you install it                              | After                                              |
+| ----------------- | -------------------------------------------------- | -------------------------------------------------- |
+| English           | Webster's 1913, WordNet and Moby thesaurus, online | the same, with Webster's offline                   |
+| 25 more languages | short English meanings from Wiktionary             | that language's own Wiktionary, offline            |
+| Translations      | —                                                  | between every pair of installed languages (FreeDict) |
 
 The other languages are Bulgarian, Catalan, Chinese, Czech, Danish, Dutch,
 Esperanto, Finnish, French, German, Greek, Italian, Japanese, Korean, Latin,
 Lithuanian, Norwegian, Polish, Portuguese, Romanian, Russian, Spanish, Swedish,
-Thai, Turkish and Ukrainian: everything [reader.dict](https://www.reader-dict.com)
-publishes for DICT servers. Not every pair has a FreeDict translation.
+Thai, Turkish and Ukrainian.
 
-Once a word is in a language you've installed, only your languages are shown
-in full, and the rest are listed as "Also in: …". Installed dictionaries are
-served by your own `dictd`, so adding one never asks for a password.
+```mermaid
+flowchart LR
+    word([casa]) --> yours{"in a language<br/>you've installed?"}
+    yours -->|yes| full["your languages in full<br/>+ Also in: Català, Italiano…"]
+    yours -->|no| every[every language that has it]
+    full & every --> offer[/"offer to install the ones you don't have"/]
+```
 
 ## Install
 
+From the AUR:
+
 ```bash
-git clone https://github.com/julitrows/omarchy-dict.git ~/code/omarchy-dict
-cd ~/code/omarchy-dict
+yay -S hyprdefine        # or paru, or omarchy pkg aur add hyprdefine
+hyprdefine --setup       # as your user: adds the keys and the dictionary server
+```
+
+Or from a git checkout, which installs the dependencies and runs `--setup` for
+you:
+
+```bash
+git clone https://github.com/julitrows/hyprdefine.git ~/code/hyprdefine
+cd ~/code/hyprdefine
 ./install.sh
 ```
 
-The installer:
+hyprdefine needs Hyprland's Lua config (`~/.config/hypr/hyprland.lua`), which
+Omarchy and current Hyprland use. On Omarchy the popup uses your theme's
+terminal; elsewhere it's your default terminal, floated and centred.
 
-- installs `dictd`, `wl-clipboard` (to read the selection), `gum` and
-  `libnotify`, and `dict-gcide` from the AUR for offline English
-- links `systemd/omarchy-dict.service`, a user-level `dictd` for your
-  dictionaries, into `~/.config/systemd/user` and enables it
-- moves dictionaries an earlier version installed system-wide into
-  `~/.local/share/omarchy-dict`
-- links `bin/define` to `~/.local/bin/define`
-- links the Claude Code skill into `~/.claude/skills`, if you use Claude Code
-- appends a `dofile(...)` line to `~/.config/hypr/hyprland.lua` that loads
-  `hypr/dictionary.lua`
+## Use it
 
-To install languages straight away, pass their codes from `lib/languages`:
-`./install.sh --languages=en,es,fr`.
+| | |
+| --- | --- |
+| **Super + Alt + D** | Open the prompt. Type a word, press Enter, and `q` to come back. Enter on an empty prompt closes it. |
+| **Super + Alt + W** | Look up the selected text. Highlighting is enough; no need to copy. `q` closes it. |
+| `hyprdefine casa` | Look a word up from any terminal. `define casa` does the same. |
+| `hyprdefine --es casa` | Look in one language only, by code. |
 
-Outside Omarchy it uses `pacman`, plus `yay` or `paru` for the AUR, and
-installs `xdg-terminal-exec` to open your default terminal. Hyprland must use
-the Lua config (`~/.config/hypr/hyprland.lua`), as Omarchy and current Hyprland
-do. On Omarchy the popup follows your theme; elsewhere it's your default
-terminal, floated and centred.
+After a lookup, the popup offers to install languages it showed that you don't
+have. Pick them with `x` and press Enter: they download and build in the
+background, and a notification says when they're ready. Languages you don't
+pick aren't offered again; Esc leaves the question for next time.
 
-The repo stays the source of truth, so edits here take effect after a
-`hyprctl reload`. Don't move the repo after installing; if you do, run
-`./uninstall.sh` and `./install.sh` again.
+### Managing languages
 
-## Usage
+Run `hyprdefine --languages`, or type `:languages` at the prompt, to add,
+remove or update languages, or to have declined ones offered again. From a
+script:
 
-- **Super + Alt + D** opens the prompt. Type a word and press Enter, then `q`
-  to get back to the prompt. Press Enter on an empty prompt to close it.
-- **Super + Alt + W** looks up the text you've selected, and `q` closes it.
-  Select a word by highlighting it; it doesn't need to be copied. With nothing
-  selected, it opens the prompt.
-- After a lookup, the popup offers to install the languages it showed that you
-  don't have. Pick them with `x` and press Enter; they install in the
-  background, with a notification when they're ready. Languages you don't pick
-  aren't offered again, and Esc asks next time instead.
-- **Managing languages**: type `:languages` at the prompt, or run
-  `define --languages`, to add, remove or update languages, or to have
-  declined ones offered again. Dictionaries live in
-  `~/.local/share/omarchy-dict`.
-- From any terminal: `define serendipity`, `define --es ñandú` to search one
-  language, or `define --selection` for the selected text.
+```bash
+hyprdefine --install fr de    # codes from lib/hyprdefine/languages
+hyprdefine --remove de
+hyprdefine --update           # rebuild from the latest Wiktionary releases
+```
 
-Lookups send the word to Wikimedia and dict.org. Without a network, only
-installed languages work.
+None of this needs `sudo`: dictionaries live in `~/.local/share/hyprdefine`
+and are served by your own `dictd` (`hyprdefine.service`). Each language takes
+a minute or two to build. English uses Webster's from the `dict-gcide`
+package when it's installed.
 
-## Claude Code
+### Changing the keys
 
-- **For users:** `skills/omarchy-dict` is a skill that lets Claude look words
-  up with `define`, and fix or rebind the popup. `install.sh` links it into
-  `~/.claude/skills` when `~/.claude` exists.
-- **For contributors:** `CLAUDE.md` explains how the project works and the
-  pitfalls it has already hit. Under `.claude/`, the `test-define` skill runs
-  the end-to-end checks, `add-language` walks through adding a language, and
-  the `reviewer` agent reviews changes before a commit.
+Copy `share/hyprdefine/hyprland.lua` (or `/usr/share/hyprdefine/hyprland.lua`)
+somewhere of your own, change the `bind(...)` lines at the end, and point the
+`-- hyprdefine` line in `~/.config/hypr/hyprland.lua` at your copy. On Omarchy,
+`omarchy menu keybindings --print` shows which keys are free.
 
-## Changing the keys
+## Privacy
 
-Edit the `bind(...)` lines at the end of `hypr/dictionary.lua`. On Omarchy,
-check that a key is free with `omarchy menu keybindings --print`, or call
-`hl.unbind("<keys>")` before the binding to replace an Omarchy default.
+Lookups send the word to Wikimedia (Wiktionary) and dict.org, except for
+databases you've installed. Without a network, only installed languages work.
+
+## Troubleshooting
+
+- **Nothing happens on the key**: run `hyprdefine --setup` again, then
+  `hyprctl configerrors`.
+- **Installed languages aren't used**: `systemctl --user status hyprdefine`
+  should be active, and `dict -h localhost -p 2629 -D` should list them.
+- **A language didn't install**: see `~/.local/share/hyprdefine/install.log`.
 
 ## Uninstall
 
 ```bash
-./uninstall.sh
+hyprdefine --teardown     # as your user: keys, server, dictionaries, `define`
+yay -R hyprdefine         # or ./uninstall.sh from a git checkout
 ```
 
-This removes the link, the keybindings, the dictionary server, every
-downloaded dictionary and your language choices, and prints the command to
-remove the packages too.
+## Development
+
+```bash
+make check    # syntax
+make test     # the test suite: offline, about 30 seconds
+```
+
+[docs/architecture.md](docs/architecture.md) explains how it all fits
+together, with diagrams, and [docs/packaging.md](docs/packaging.md) how the
+AUR package is built and published. `CLAUDE.md` covers the same ground for
+Claude Code, along with the pitfalls this project has already hit.
 
 ## Credits
 
-Definitions in languages other than English come from
-[Wiktionary](https://www.wiktionary.org/) (CC BY-SA): English meanings through
-its API, and each language's own Wiktionary packaged by
-[reader.dict](https://www.reader-dict.com). Translations come from
-[FreeDict](https://freedict.org/). They're downloaded when you look words up
-or install a language, and aren't part of this repo.
+Definitions come from [Wiktionary](https://www.wiktionary.org/) (CC BY-SA),
+through English Wiktionary's API and each language's own Wiktionary as
+packaged by [reader.dict](https://www.reader-dict.com); translations from
+[FreeDict](https://freedict.org/); English from
+[GCIDE](https://gcide.gnu.org.ua/), [WordNet](https://wordnet.princeton.edu/)
+and the Moby thesaurus through [dict.org](https://dict.org). They're
+downloaded as you use them and aren't part of this repo.
+
+hyprdefine was called omarchy-dict until it stopped needing Omarchy.
+`hyprdefine --setup` moves an omarchy-dict install over.

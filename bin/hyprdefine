@@ -1,0 +1,67 @@
+#!/bin/bash
+
+# hyprdefine: look words up in any language from a floating Hyprland popup.
+#
+# Usage:
+#   hyprdefine [--<code>] [word...]   look a word up, or prompt for words
+#   hyprdefine --selection            look up the selected text
+#   hyprdefine --languages            add, remove or update languages
+#   hyprdefine --install <code>...    install languages
+#   hyprdefine --remove <code>...     remove languages
+#   hyprdefine --update               rebuild the installed languages
+#   hyprdefine --setup                set up keys, server and links for this user
+#   hyprdefine --teardown             undo --setup and delete the dictionaries
+#
+# --<code> searches one language, such as --es; the codes are listed in
+# lib/hyprdefine/languages. `define` is a shorter name for the same command.
+
+# Relative to the real file, so it works from a git checkout, through the
+# ~/.local/bin links, and installed under /usr.
+LIB="$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/../lib/hyprdefine"
+LIB="$(readlink -f "$LIB")"
+source "$LIB/common.sh"
+
+usage() {
+  sed -n '/^# Usage:/,/^$/s/^# \{0,1\}//p' "$SELF"
+}
+
+# Language changes run one at a time, so a background install and the menu
+# can't step on each other.
+locked() {
+  mkdir -p "$DATA"
+  exec 9>"$DATA/lock"
+  flock 9
+  "$@"
+}
+
+case ${1:-} in
+  --install | --remove | --update | --decline | --serve)
+    set -eEuo pipefail
+    source "$LIB/dictionaries.sh"
+    command=$1
+    shift
+    case $command in
+      --install) locked install_languages "$@" ;;
+      --remove) locked remove_languages "$@" ;;
+      --update) locked update_languages ;;
+      --decline) decline_languages "$@" ;;
+      --serve) serve ;;
+    esac
+    ;;
+  --languages)
+    source "$LIB/dictionaries.sh"
+    manage_languages
+    ;;
+  --setup | --teardown)
+    set -euo pipefail
+    source "$LIB/setup.sh"
+    "${1#--}"
+    ;;
+  --help | -h)
+    usage
+    ;;
+  *)
+    source "$LIB/lookup.sh"
+    run_lookup "$@"
+    ;;
+esac

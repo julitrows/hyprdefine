@@ -110,6 +110,10 @@ def entries(archive):
 
 def main():
     out = sys.stdout
+    # dictfmt -f takes the first two lines starting in column 0 as the
+    # database's info, not as headwords, so give it two.
+    out.write("Wiktionary, converted from reader.dict's download by hyprdefine.\n")
+    out.write("https://www.reader-dict.com\n")
     for headword, html in entries(sys.argv[1]):
         lines = Renderer().render(html)
         if lines:

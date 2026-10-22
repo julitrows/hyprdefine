@@ -7,7 +7,7 @@
 # with English glosses, in one request. Other Wiktionaries have no such API,
 # which is why definitions in the word's own language come from reader.dict.
 #
-# Usage: wiktionary.py <word> <lib/languages> <output directory>
+# Usage: wiktionary.py <word> <lib/hyprdefine/languages> <output directory>
 
 import html
 import json
@@ -18,12 +18,14 @@ import textwrap
 import urllib.parse
 import urllib.request
 
-API = "https://en.wiktionary.org/api/rest_v1/page/definition/"
+# Tests point HYPRDEFINE_WIKTIONARY_URL at a local server.
+API = os.environ.get("HYPRDEFINE_WIKTIONARY_URL",
+                     "https://en.wiktionary.org/api/rest_v1/page/definition/")
 # Wikimedia asks API clients to identify themselves.
-USER_AGENT = "omarchy-dict (https://github.com/julitrows/omarchy-dict)"
+USER_AGENT = "hyprdefine (https://github.com/julitrows/hyprdefine)"
 INDENT = " " * 8
 WIDTH = 78
-# Wiktionary splits some languages that omarchy-dict treats as one.
+# Wiktionary splits some languages that hyprdefine treats as one.
 ALIASES = {"nb": "no", "nn": "no"}
 
 
@@ -64,6 +66,8 @@ def main():
             found = json.load(response)
     except Exception:
         # Not found (404), offline or timed out: there's nothing to write.
+        sys.exit(1)
+    if not isinstance(found, dict):
         sys.exit(1)
 
     by_code = {}
